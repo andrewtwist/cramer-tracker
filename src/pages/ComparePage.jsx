@@ -1,11 +1,53 @@
+import { useState } from 'react'
 import { usePortfolio } from '../lib/usePortfolio'
-import { RefreshCw, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
+import { RefreshCw, ChevronUp, ChevronDown, ChevronsUpDown, AlertCircle } from 'lucide-react'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
 const fmtPct = (n) => `${n >= 0 ? '+' : ''}${(n || 0).toFixed(2)}%`
 
 export default function ComparePage() {
   const { userCalc, cramerCalc, loadingPortfolio, loadingPrices, refreshPrices, prices } = usePortfolio()
+
+  const [sortField, setSortField] = useState('cramerValue')
+  const [sortDir, setSortDir] = useState('desc')
+  const [needsSortField, setNeedsSortField] = useState('dollarShortfall')
+  const [needsSortDir, setNeedsSortDir] = useState('desc')
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('desc')
+    }
+  }
+
+  const handleNeedsSort = (field) => {
+    if (needsSortField === field) {
+      setNeedsSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setNeedsSortField(field)
+      setNeedsSortDir('desc')
+    }
+  }
+
+  const SortIcon = ({ field, activeField, activeDir }) => {
+    if (activeField !== field) return <ChevronsUpDown size={12} style={{ opacity: 0.3 }} />
+    return activeDir === 'asc'
+      ? <ChevronUp size={12} style={{ color: 'var(--gold)' }} />
+      : <ChevronDown size={12} style={{ color: 'var(--gold)' }} />
+  }
+
+  const SortTh = ({ field, label, onSort, activeField, activeDir, style }) => (
+    <th
+      onClick={() => onSort(field)}
+      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', ...style }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {label} <SortIcon field={field} activeField={activeField} activeDir={activeDir} />
+      </span>
+    </th>
+  )
 
   if (loadingPortfolio) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
@@ -17,8 +59,8 @@ export default function ComparePage() {
   const cramerTotal = cramerCalc.totalValue
   const diffDollars = userTotal - cramerTotal
   const diffPercent = cramerTotal > 0 ? ((userTotal - cramerTotal) / cramerTotal) * 100 : 0
+  const userVsCramerPct = cramerTotal > 0 ? (userTotal / cramerTotal) * 100 : 0
 
-  // Build merged symbol comparison
   const allSymbols = new Set([
     ...userCalc.holdings.map(h => h.symbol),
     ...cramerCalc.holdings.map(h => h.symbol)
@@ -35,9 +77,6 @@ export default function ComparePage() {
     const userValue = userShares * currentPrice
     const cramerValue = cramerShares * currentPrice
 
-    // How many shares needed to match Cramer's % allocation?
-    // Cramer's % of his portfolio = cramerValue / cramerTotal
-    // What user needs = that % * userTotal / currentPrice
     const cramerAllocationPct = cramerTotal > 0 ? cramerValue / cramerTotal : 0
     const targetValueForUser = cramerAllocationPct * userTotal
     const sharesNeededToMatch = currentPrice > 0 ? targetValueForUser / currentPrice : 0
@@ -61,14 +100,49 @@ export default function ComparePage() {
       onlyUser: !cramerHolding,
       onlyCramer: !userHolding
     }
-  }).sort((a, b) => b.cramerValue - a.cramerValue)
+  })
 
-  // Stocks where user needs to buy more to match Cramer's allocation
-  const needToBuy = symbolMap
-    .filter(s => !s.onlyUser && s.sharesShortfall > 0.001)
-    .sort((a, b) => b.dollarShortfall - a.dollarShortfall)
+  // Sort full comparison table
+  const sortedSymbolMap = [...symbolMap].sort((a, b) => {
+    let aVal, bVal
+    switch (sortField) {
+      case 'symbol':
+        return sortDir === 'asc'
+          ? a.symbol.localeCompare(b.symbol)
+          : b.symbol.localeCompare(a.symbol)
+      case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break
+      case 'userShares': aVal = a.userShares; bVal = b.userShares; break
+      case 'userValue': aVal = a.userValue; bVal = b.userValue; break
+      case 'userAlloc': aVal = a.userAllocationPct; bVal = b.userAllocationPct; break
+      case 'cramerShares': aVal = a.cramerShares; bVal = b.cramerShares; break
+      case 'cramerValue': aVal = a.cramerValue; bVal = b.cramerValue; break
+      case 'cramerAlloc': aVal = a.cramerAllocationPct; bVal = b.cramerAllocationPct; break
+      case 'change': aVal = a.changePercent; bVal = b.changePercent; break
+      default: aVal = a.cramerValue; bVal = b.cramerValue
+    }
+    return sortDir === 'asc' ? aVal - bVal : bVal - aVal
+  })
 
-  // Stocks Cramer has but user doesn't
+  // Sort "shares needed" table
+  const needToBuy = symbolMap.filter(s => !s.onlyUser && s.sharesShortfall > 0.001)
+  const sortedNeedToBuy = [...needToBuy].sort((a, b) => {
+    let aVal, bVal
+    switch (needsSortField) {
+      case 'symbol':
+        return needsSortDir === 'asc'
+          ? a.symbol.localeCompare(b.symbol)
+          : b.symbol.localeCompare(a.symbol)
+      case 'userShares': aVal = a.userShares; bVal = b.userShares; break
+      case 'cramerShares': aVal = a.cramerShares; bVal = b.cramerShares; break
+      case 'cramerAlloc': aVal = a.cramerAllocationPct; bVal = b.cramerAllocationPct; break
+      case 'sharesNeeded': aVal = a.sharesNeededToMatch; bVal = b.sharesNeededToMatch; break
+      case 'sharesShortfall': aVal = a.sharesShortfall; bVal = b.sharesShortfall; break
+      case 'dollarShortfall': aVal = a.dollarShortfall; bVal = b.dollarShortfall; break
+      default: aVal = a.dollarShortfall; bVal = b.dollarShortfall
+    }
+    return needsSortDir === 'asc' ? aVal - bVal : bVal - aVal
+  })
+
   const missingFromUser = symbolMap.filter(s => s.onlyCramer)
 
   return (
@@ -89,7 +163,7 @@ export default function ComparePage() {
         </div>
       )}
 
-      {/* HEADLINE COMPARISON */}
+      {/* HEADLINE STATS */}
       <div className="stat-grid mb-24">
         <div className={`stat-card ${diffDollars >= 0 ? 'positive' : 'negative'}`}>
           <div className="stat-label">Performance vs Cramer</div>
@@ -101,7 +175,7 @@ export default function ComparePage() {
         <div className="stat-card">
           <div className="stat-label">Your Size vs Cramer's</div>
           <div className="stat-value gold">
-            {cramerTotal > 0 ? `${((userTotal / cramerTotal) * 100).toFixed(1)}%` : '—'}
+            {cramerTotal > 0 ? `${userVsCramerPct.toFixed(1)}%` : '—'}
           </div>
           <div className="stat-sub">of his total portfolio value</div>
         </div>
@@ -109,7 +183,7 @@ export default function ComparePage() {
           <div className="stat-label">Shared Holdings</div>
           <div className="stat-value">{symbolMap.filter(s => !s.onlyUser && !s.onlyCramer).length}</div>
           <div className="stat-sub">
-            {missingFromUser.length} only in Cramer's • {symbolMap.filter(s => s.onlyUser).length} only yours
+            {missingFromUser.length} only Cramer's • {symbolMap.filter(s => s.onlyUser).length} only yours
           </div>
         </div>
         <div className="stat-card">
@@ -121,30 +195,35 @@ export default function ComparePage() {
         </div>
       </div>
 
-      {/* SHARES NEEDED TO MATCH TABLE */}
-      {needToBuy.length > 0 && (
+      {/* SHARES NEEDED TABLE */}
+      {sortedNeedToBuy.length > 0 && (
         <div className="card mb-24">
           <div className="card-header">
             <div className="card-title">📊 Shares Needed to Match Cramer's Allocation</div>
-            <span className="badge badge-gold">{needToBuy.length} adjustments</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+                Click headers to sort
+              </span>
+              <span className="badge badge-gold">{sortedNeedToBuy.length} adjustments</span>
+            </div>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Based on matching Cramer's <em>percentage allocation</em> per stock, scaled to your portfolio size.
+            Based on matching Cramer's percentage allocation per stock, scaled to your portfolio size.
           </p>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th>Your Shares</th>
-                <th>Cramer's Shares</th>
-                <th>Cramer Alloc %</th>
-                <th>Target Shares (for you)</th>
-                <th>Need to Buy</th>
-                <th>$ to Buy</th>
+                <SortTh field="symbol" label="Symbol" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="userShares" label="Your Shares" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="cramerShares" label="Cramer Shares" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="cramerAlloc" label="Cramer %" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="sharesNeeded" label="Target Shares" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="sharesShortfall" label="Need to Buy" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
+                <SortTh field="dollarShortfall" label="$ to Buy" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
               </tr>
             </thead>
             <tbody>
-              {needToBuy.map(s => (
+              {sortedNeedToBuy.map(s => (
                 <tr key={s.symbol}>
                   <td>
                     <div className="symbol">{s.symbol}</div>
@@ -162,7 +241,7 @@ export default function ComparePage() {
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--blue)' }}>
                     {s.sharesNeededToMatch.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', fontWeight: 700 }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>
                     +{s.sharesShortfall.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </td>
                   <td>
@@ -175,17 +254,20 @@ export default function ComparePage() {
         </div>
       )}
 
-      {/* FULL SIDE BY SIDE */}
+      {/* FULL COMPARISON TABLE */}
       <div className="card mb-24">
         <div className="card-header">
           <div className="card-title">Full Portfolio Comparison</div>
-          <div style={{ display: 'flex', gap: 12, fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-            <span style={{ color: 'var(--blue)' }}>■ You ({fmt(userTotal)})</span>
-            <span style={{ color: 'var(--gold)' }}>■ Cramer ({fmt(cramerTotal)})</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+              Click headers to sort
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)' }}>■ You ({fmt(userTotal)})</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gold)' }}>■ Cramer ({fmt(cramerTotal)})</span>
           </div>
         </div>
 
-        {symbolMap.length === 0 ? (
+        {sortedSymbolMap.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
             <div className="empty-title">Nothing to compare yet</div>
@@ -195,19 +277,19 @@ export default function ComparePage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th>Price</th>
-                <th style={{ color: 'var(--blue)' }}>Your Shares</th>
-                <th style={{ color: 'var(--blue)' }}>Your Value</th>
-                <th style={{ color: 'var(--blue)' }}>Your %</th>
-                <th style={{ color: 'var(--gold)' }}>Cramer Shares</th>
-                <th style={{ color: 'var(--gold)' }}>Cramer Value</th>
-                <th style={{ color: 'var(--gold)' }}>Cramer %</th>
-                <th>Day Chg</th>
+                <SortTh field="symbol" label="Symbol" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="price" label="Price" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="userShares" label="Your Shares" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--blue)' }} />
+                <SortTh field="userValue" label="Your Value" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--blue)' }} />
+                <SortTh field="userAlloc" label="Your %" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--blue)' }} />
+                <SortTh field="cramerShares" label="Cramer Shares" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--gold)' }} />
+                <SortTh field="cramerValue" label="Cramer Value" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--gold)' }} />
+                <SortTh field="cramerAlloc" label="Cramer %" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--gold)' }} />
+                <SortTh field="change" label="Day Chg" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
               </tr>
             </thead>
             <tbody>
-              {symbolMap.map(s => (
+              {sortedSymbolMap.map(s => (
                 <tr key={s.symbol} style={{ opacity: s.currentPrice === 0 ? 0.5 : 1 }}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -225,9 +307,9 @@ export default function ComparePage() {
                     {s.userValue > 0 ? fmt(s.userValue) : '—'}
                   </td>
                   <td>
-                    {s.userAllocationPct > 0 ? (
-                      <AllocationBar pct={s.userAllocationPct} color="var(--blue)" />
-                    ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                    {s.userAllocationPct > 0
+                      ? <AllocationBar pct={s.userAllocationPct} color="var(--blue)" />
+                      : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: s.onlyUser ? 'var(--text-muted)' : 'var(--gold)' }}>
                     {s.cramerShares > 0 ? s.cramerShares.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
@@ -236,9 +318,9 @@ export default function ComparePage() {
                     {s.cramerValue > 0 ? fmt(s.cramerValue) : '—'}
                   </td>
                   <td>
-                    {s.cramerAllocationPct > 0 ? (
-                      <AllocationBar pct={s.cramerAllocationPct} color="var(--gold)" />
-                    ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                    {s.cramerAllocationPct > 0
+                      ? <AllocationBar pct={s.cramerAllocationPct} color="var(--gold)" />
+                      : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
                   </td>
                   <td>
                     <span className={`change-badge ${s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat'}`}>
@@ -273,7 +355,9 @@ export default function ComparePage() {
                 fontSize: 12
               }}>
                 <div style={{ color: 'var(--gold)', fontWeight: 700 }}>{s.symbol}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{fmt(s.cramerValue)} ({s.cramerAllocationPct.toFixed(1)}%)</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                  {fmt(s.cramerValue)} ({s.cramerAllocationPct.toFixed(1)}%)
+                </div>
               </div>
             ))}
           </div>
