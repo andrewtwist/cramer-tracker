@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { usePortfolio } from '../lib/usePortfolio'
 import { validateSymbol } from '../lib/stocks'
-import { Plus, Trash2, RefreshCw, DollarSign, Search } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, DollarSign, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
-const fmtShort = (n) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(n || 0)
 
 export default function PortfolioPage() {
   const { userPortfolio, userCalc, loadingPortfolio, loadingPrices, addOrUpdateHolding, removeHolding, setCash, refreshPrices } = usePortfolio()
@@ -18,6 +17,76 @@ export default function PortfolioPage() {
   const [success, setSuccess] = useState('')
   const [symbolInfo, setSymbolInfo] = useState(null)
   const [showCashModal, setShowCashModal] = useState(false)
+  const [sortField, setSortField] = useState('value')
+  const [sortDir, setSortDir] = useState('desc')
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('desc')
+    }
+  }
+
+  const sortedHoldings = [...userCalc.holdings].sort((a, b) => {
+    let aVal, bVal
+    switch (sortField) {
+      case 'symbol':
+        aVal = a.symbol
+        bVal = b.symbol
+        return sortDir === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal)
+      case 'shares':
+        aVal = parseFloat(a.shares)
+        bVal = parseFloat(b.shares)
+        break
+      case 'price':
+        aVal = a.currentPrice
+        bVal = b.currentPrice
+        break
+      case 'value':
+        aVal = a.value
+        bVal = b.value
+        break
+      case 'pct':
+        aVal = a.pctOfPortfolio
+        bVal = b.pctOfPortfolio
+        break
+      case 'change':
+        aVal = a.changePercent
+        bVal = b.changePercent
+        break
+      default:
+        aVal = a.value
+        bVal = b.value
+    }
+    return sortDir === 'asc' ? aVal - bVal : bVal - aVal
+  })
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return <ChevronsUpDown size={12} style={{ opacity: 0.3 }} />
+    return sortDir === 'asc'
+      ? <ChevronUp size={12} style={{ color: 'var(--gold)' }} />
+      : <ChevronDown size={12} style={{ color: 'var(--gold)' }} />
+  }
+
+  const SortHeader = ({ field, label, align }) => (
+    <th
+      onClick={() => handleSort(field)}
+      style={{
+        cursor: 'pointer',
+        userSelect: 'none',
+        textAlign: align || 'left',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {label} <SortIcon field={field} />
+      </span>
+    </th>
+  )
 
   const handleSymbolBlur = async () => {
     if (!symbol || symbol.length < 1) return
@@ -111,12 +180,16 @@ export default function PortfolioPage() {
         <div className="stat-card">
           <div className="stat-label">Stock Value</div>
           <div className="stat-value">{fmt(userCalc.stockValue)}</div>
-          <div className="stat-sub">{userCalc.totalValue > 0 ? ((userCalc.stockValue / userCalc.totalValue) * 100).toFixed(1) : 0}% of portfolio</div>
+          <div className="stat-sub">
+            {userCalc.totalValue > 0 ? ((userCalc.stockValue / userCalc.totalValue) * 100).toFixed(1) : 0}% of portfolio
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Cash Available</div>
           <div className="stat-value gold">{fmt(userCalc.cashValue)}</div>
-          <div className="stat-sub">{userCalc.totalValue > 0 ? ((userCalc.cashValue / userCalc.totalValue) * 100).toFixed(1) : 0}% of portfolio</div>
+          <div className="stat-sub">
+            {userCalc.totalValue > 0 ? ((userCalc.cashValue / userCalc.totalValue) * 100).toFixed(1) : 0}% of portfolio
+          </div>
         </div>
       </div>
 
@@ -139,6 +212,7 @@ export default function PortfolioPage() {
                   value={symbol}
                   onChange={e => { setSymbol(e.target.value.toUpperCase()); setSymbolInfo(null); setError('') }}
                   onBlur={handleSymbolBlur}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSymbolBlur() } }}
                   placeholder="AAPL"
                   style={{ textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
                 />
@@ -177,10 +251,10 @@ export default function PortfolioPage() {
             </button>
           </form>
 
-          <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--bg-input)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.8 }}>
-            <div>• Enter symbol and hit Tab to validate</div>
-            <div>• If stock already held, shares will be REPLACED (not added)</div>
-            <div>• Set to 0 to effectively clear a position, or use Delete button</div>
+          <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--bg-input)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+            <div>• Enter symbol and press Tab or Enter to validate</div>
+            <div>• If stock already held, shares will be replaced</div>
+            <div>• Use Delete button to remove a position entirely</div>
           </div>
         </div>
 
@@ -188,10 +262,15 @@ export default function PortfolioPage() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Holdings</div>
-            <span className="badge badge-blue">{userCalc.holdings.length} positions</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+                Click column headers to sort
+              </span>
+              <span className="badge badge-blue">{userCalc.holdings.length} positions</span>
+            </div>
           </div>
 
-          {userCalc.holdings.length === 0 ? (
+          {sortedHoldings.length === 0 ? (
             <div className="empty-state" style={{ padding: 40 }}>
               <div className="empty-icon">📈</div>
               <div className="empty-title">No Holdings Yet</div>
@@ -201,17 +280,17 @@ export default function PortfolioPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Symbol</th>
-                  <th>Shares</th>
-                  <th>Price</th>
-                  <th>Value</th>
-                  <th>% Port</th>
-                  <th>Change</th>
+                  <SortHeader field="symbol" label="Symbol" />
+                  <SortHeader field="shares" label="Shares" />
+                  <SortHeader field="price" label="Price" />
+                  <SortHeader field="value" label="Value" />
+                  <SortHeader field="pct" label="% Port" />
+                  <SortHeader field="change" label="Change" />
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {userCalc.holdings.map(h => (
+                {sortedHoldings.map(h => (
                   <tr key={h.id}>
                     <td>
                       <div className="symbol">{h.symbol}</div>
