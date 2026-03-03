@@ -1,19 +1,9 @@
-// ============================================================
-// Stock Price Service
-// Uses Yahoo Finance via AllOrigins CORS proxy (completely free, no API key needed)
-// Fallback: Finnhub free tier (60 req/min, requires free signup at finnhub.io)
-// ============================================================
+const CACHE_TTL_MS = 3 * 60 * 1000
 
-const CACHE_TTL_MS = 3 * 60 * 1000 // 3 minutes local cache
-
-// In-memory cache to avoid hammering the API
 const localCache = new Map()
 
-// -------------------------------------------------------
-// YAHOO FINANCE (primary - no API key needed)
-// -------------------------------------------------------
 const fetchYahooPrice = async (symbol) => {
-  const proxyUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d&corsDomain=finance.yahoo.com`
+  const proxyUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`
   
   const response = await fetch(
     `https://api.allorigins.win/raw?url=${encodeURIComponent(proxyUrl)}`,
@@ -22,7 +12,8 @@ const fetchYahooPrice = async (symbol) => {
   
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   
-  const data = await response.json()
+  const text = await response.text()
+  const data = JSON.parse(text)
   const result = data?.chart?.result?.[0]
   if (!result) throw new Error('No data returned')
 
@@ -43,9 +34,6 @@ const fetchYahooPrice = async (symbol) => {
   }
 }
 
-// -------------------------------------------------------
-// FINNHUB FALLBACK (free tier - 60 req/min)
-// -------------------------------------------------------
 const fetchFinnhubPrice = async (symbol) => {
   const apiKey = import.meta.env.VITE_FINNHUB_API_KEY
   if (!apiKey) throw new Error('No Finnhub API key configured')
@@ -72,9 +60,6 @@ const fetchFinnhubPrice = async (symbol) => {
   }
 }
 
-// -------------------------------------------------------
-// MAIN FETCH WITH CACHING
-// -------------------------------------------------------
 export const fetchStockPrice = async (symbol) => {
   const upperSymbol = symbol.toUpperCase()
   const cached = localCache.get(upperSymbol)
@@ -87,12 +72,10 @@ export const fetchStockPrice = async (symbol) => {
   try {
     data = await fetchYahooPrice(upperSymbol)
   } catch (yahooErr) {
-    console.warn(`Yahoo Finance failed for ${upperSymbol}, trying Finnhub...`, yahooErr.message)
+    console.warn(`Yahoo Finance failed for ${upperSymbol}:`, yahooErr.message)
     try {
       data = await fetchFinnhubPrice(upperSymbol)
     } catch (finnhubErr) {
-      console.error(`All price sources failed for ${upperSymbol}`)
-      // Return cached data even if stale, rather than nothing
       if (cached) return cached.data
       throw new Error(`Could not fetch price for ${upperSymbol}`)
     }
@@ -102,14 +85,11 @@ export const fetchStockPrice = async (symbol) => {
   return data
 }
 
-// -------------------------------------------------------
-// BATCH FETCH (with rate limiting)
-// -------------------------------------------------------
 export const fetchMultiplePrices = async (symbols, onProgress = null) => {
   const results = {}
   const errors = {}
   const BATCH_SIZE = 3
-  const DELAY_MS = 500
+  const DELAY_MS = 300
 
   const batches = []
   for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
@@ -134,7 +114,6 @@ export const fetchMultiplePrices = async (symbols, onProgress = null) => {
       onProgress(Math.min(((batchIdx + 1) * BATCH_SIZE / symbols.length) * 100, 100))
     }
 
-    // Small delay between batches to avoid rate limiting
     if (batchIdx < batches.length - 1) {
       await new Promise(r => setTimeout(r, DELAY_MS))
     }
@@ -143,21 +122,18 @@ export const fetchMultiplePrices = async (symbols, onProgress = null) => {
   return { results, errors }
 }
 
-// -------------------------------------------------------
-// VALIDATE SYMBOL (quick check)
-// -------------------------------------------------------
 export const validateSymbol = async (symbol) => {
   try {
     const data = await fetchStockPrice(symbol)
-    return { valid: true, data }
+    if (data && data.price > 0) {
+      return { valid: true, data }
+    }
+    return { valid: false, data: null }
   } catch {
     return { valid: false, data: null }
   }
 }
 
-// -------------------------------------------------------
-// MARKET STATUS (approximate based on US Eastern time)
-// -------------------------------------------------------
 export const isMarketOpen = () => {
   const now = new Date()
   const eastern = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
@@ -165,7 +141,6 @@ export const isMarketOpen = () => {
   const hours = eastern.getHours()
   const minutes = eastern.getMinutes()
   const timeInMinutes = hours * 60 + minutes
-
-  if (day === 0 || day === 6) return false // Weekend
-  return timeInMinutes >= 570 && timeInMinutes < 960 // 9:30 AM - 4:00 PM ET
+  if (day === 0 || day === 6) return false
+  return timeInMinutes >= 570 && timeInMinutes < 960
 }
