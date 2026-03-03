@@ -8,32 +8,31 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const loadProfile = async (userId) => {
-    console.log('loadProfile called for:', userId)
-    const { data, error } = await getProfile(userId)
-    console.log('loadProfile result:', data, error)
-    setProfile(data)
-    return data
-  }
+const loadProfile = async (userId) => {
+  console.log('loadProfile called for:', userId)
+  const { data, error } = await getProfile(userId)
+  console.log('loadProfile result:', data, error)
+  setProfile(data)
+  return data
+}
 
   useEffect(() => {
     console.log('AuthProvider: getting session...')
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('getSession result:', session?.user?.id, error)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        loadProfile(session.user.id).finally(() => {
-          console.log('loadProfile done, setting loading=false')
-          setLoading(false)
-        })
-      } else {
-        console.log('No session, setting loading=false')
-        setLoading(false)
-      }
-    }).catch(err => {
-      console.error('getSession error:', err)
+  console.log('getSession result:', session?.user?.id, error)
+  setUser(session?.user ?? null)
+  if (session?.user) {
+    loadProfile(session.user.id).finally(() => {
+      console.log('setting loading=false')
       setLoading(false)
     })
+  } else {
+    setLoading(false)
+  }
+}).catch(err => {
+  console.error('getSession threw:', err)
+  setLoading(false)
+})
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('auth state change:', event, session?.user?.id)
