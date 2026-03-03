@@ -1,38 +1,5 @@
 const CACHE_TTL_MS = 3 * 60 * 1000
-
 const localCache = new Map()
-
-const fetchYahooPrice = async (symbol) => {
-  const proxyUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`
-  
-  const response = await fetch(
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(proxyUrl)}`,
-    { signal: AbortSignal.timeout(10000) }
-  )
-  
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  
-  const text = await response.text()
-  const data = JSON.parse(text)
-  const result = data?.chart?.result?.[0]
-  if (!result) throw new Error('No data returned')
-
-  const meta = result.meta
-  const price = meta.regularMarketPrice || meta.previousClose
-  const previousClose = meta.previousClose || meta.chartPreviousClose
-  const changePercent = previousClose
-    ? ((price - previousClose) / previousClose) * 100
-    : 0
-
-  return {
-    symbol: symbol.toUpperCase(),
-    price: parseFloat(price.toFixed(4)),
-    previous_close: parseFloat((previousClose || 0).toFixed(4)),
-    change_percent: parseFloat(changePercent.toFixed(4)),
-    company_name: meta.longName || meta.shortName || symbol,
-    fetched_at: new Date().toISOString()
-  }
-}
 
 const fetchFinnhubPrice = async (symbol) => {
   const apiKey = import.meta.env.VITE_FINNHUB_API_KEY
@@ -43,10 +10,12 @@ const fetchFinnhubPrice = async (symbol) => {
     fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`)
   ])
 
+  if (!quoteRes.ok) throw new Error(`HTTP ${quoteRes.status}`)
+
   const quote = await quoteRes.json()
   const profile = await profileRes.json()
 
-  if (!quote.c) throw new Error('Invalid quote data')
+  if (!quote.c || quote.c === 0) throw new Error(`Invalid symbol: ${symbol}`)
 
   const changePercent = quote.pc ? ((quote.c - quote.pc) / quote.pc) * 100 : 0
 
@@ -68,19 +37,7 @@ export const fetchStockPrice = async (symbol) => {
     return cached.data
   }
 
-  let data
-  try {
-    data = await fetchYahooPrice(upperSymbol)
-  } catch (yahooErr) {
-    console.warn(`Yahoo Finance failed for ${upperSymbol}:`, yahooErr.message)
-    try {
-      data = await fetchFinnhubPrice(upperSymbol)
-    } catch (finnhubErr) {
-      if (cached) return cached.data
-      throw new Error(`Could not fetch price for ${upperSymbol}`)
-    }
-  }
-
+  const data = await fetchFinnhubPrice(upperSymbol)
   localCache.set(upperSymbol, { data, timestamp: Date.now() })
   return data
 }
@@ -88,8 +45,8 @@ export const fetchStockPrice = async (symbol) => {
 export const fetchMultiplePrices = async (symbols, onProgress = null) => {
   const results = {}
   const errors = {}
-  const BATCH_SIZE = 3
-  const DELAY_MS = 300
+  const BATCH_SIZE = 5
+  const DELAY_MS = 200
 
   const batches = []
   for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
