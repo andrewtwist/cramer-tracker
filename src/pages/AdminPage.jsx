@@ -1,42 +1,15 @@
-import { useState, useEffect } from 'react'
-const [adminSortField, setAdminSortField] = useState('value')
-const [adminSortDir, setAdminSortDir] = useState('desc')
-
-const handleAdminSort = (field) => {
-  if (adminSortField === field) {
-    setAdminSortDir(d => d === 'asc' ? 'desc' : 'asc')
-  } else {
-    setAdminSortField(field)
-    setAdminSortDir('desc')
-  }
-}
-
-const sortedCramerHoldings = [...cramerCalc.holdings].sort((a, b) => {
-  let aVal, bVal
-  switch (adminSortField) {
-    case 'symbol':
-      return adminSortDir === 'asc'
-        ? a.symbol.localeCompare(b.symbol)
-        : b.symbol.localeCompare(a.symbol)
-    case 'shares': aVal = parseFloat(a.shares); bVal = parseFloat(b.shares); break
-    case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break
-    case 'value': aVal = a.value; bVal = b.value; break
-    case 'pct': aVal = a.pctOfPortfolio; bVal = b.pctOfPortfolio; break
-    default: aVal = a.value; bVal = b.value
-  }
-  return adminSortDir === 'asc' ? aVal - bVal : bVal - aVal
-})
-
+import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { usePortfolio } from '../lib/usePortfolio'
-import { getCramerPortfolio, createPortfolio, updatePortfolioCash, upsertHolding, deleteHolding } from '../lib/supabase'
+import { updatePortfolioCash, upsertHolding, deleteHolding } from '../lib/supabase'
 import { validateSymbol } from '../lib/stocks'
-import { Plus, Trash2, RefreshCw, ShieldCheck, DollarSign } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, ShieldCheck, DollarSign, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
 
 export default function AdminPage() {
   const { user } = useAuth()
+  const { supabase } = { supabase: null }
   const { cramerPortfolio, cramerCalc, loadingPortfolio, refreshPrices, loadPortfolios } = usePortfolio()
 
   const [symbol, setSymbol] = useState('')
@@ -49,22 +22,52 @@ export default function AdminPage() {
   const [symbolInfo, setSymbolInfo] = useState(null)
   const [showCashModal, setShowCashModal] = useState(false)
   const [initializingPortfolio, setInitializingPortfolio] = useState(false)
+  const [adminSortField, setAdminSortField] = useState('value')
+  const [adminSortDir, setAdminSortDir] = useState('desc')
+
+  const handleAdminSort = (field) => {
+    if (adminSortField === field) {
+      setAdminSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setAdminSortField(field)
+      setAdminSortDir('desc')
+    }
+  }
+
+  const SortIcon = ({ field }) => {
+    if (adminSortField !== field) return <ChevronsUpDown size={12} style={{ opacity: 0.3 }} />
+    return adminSortDir === 'asc'
+      ? <ChevronUp size={12} style={{ color: 'var(--gold)' }} />
+      : <ChevronDown size={12} style={{ color: 'var(--gold)' }} />
+  }
+
+  const sortedCramerHoldings = [...cramerCalc.holdings].sort((a, b) => {
+    let aVal, bVal
+    switch (adminSortField) {
+      case 'symbol':
+        return adminSortDir === 'asc'
+          ? a.symbol.localeCompare(b.symbol)
+          : b.symbol.localeCompare(a.symbol)
+      case 'shares': aVal = parseFloat(a.shares); bVal = parseFloat(b.shares); break
+      case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break
+      case 'value': aVal = a.value; bVal = b.value; break
+      case 'pct': aVal = a.pctOfPortfolio; bVal = b.pctOfPortfolio; break
+      default: aVal = a.value; bVal = b.value
+    }
+    return adminSortDir === 'asc' ? aVal - bVal : bVal - aVal
+  })
 
   const handleInitCramerPortfolio = async () => {
     setInitializingPortfolio(true)
     setError('')
     try {
-      // Create a Cramer portfolio owned by the admin user
-      const { data, error } = await createPortfolio(user.id, "Jim Cramer Mad Money Portfolio", 0)
+      const { supabase: sb } = await import('../lib/supabase')
+      const { data, error } = await sb
+        .from('portfolios')
+        .insert({ user_id: user.id, name: 'Jim Cramer Mad Money Portfolio', is_cramer: true, cash_balance: 0 })
+        .select()
+        .single()
       if (error) throw error
-
-      // Mark it as Cramer's via direct upsert (need to manually set is_cramer=true)
-      // This requires a Supabase function or direct update
-      const { supabase } = await import('../lib/supabase')
-      const { createClient } = await import('@supabase/supabase-js')
-      const sb = (await import('../lib/supabase')).supabase
-      await sb.from('portfolios').update({ is_cramer: true }).eq('id', data.id)
-
       await loadPortfolios()
       setSuccess("Cramer's portfolio initialized!")
     } catch (e) {
@@ -78,6 +81,7 @@ export default function AdminPage() {
     if (!symbol) return
     setValidating(true)
     setSymbolInfo(null)
+    setError('')
     const { valid, data } = await validateSymbol(symbol)
     setValidating(false)
     if (valid) setSymbolInfo(data)
@@ -162,7 +166,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* INIT CRAMER */}
       {!cramerPortfolio && (
         <div className="card mb-24" style={{ borderColor: 'var(--gold-dim)', background: 'rgba(240,192,64,0.03)' }}>
           <div className="cramer-avatar" style={{ marginBottom: 16 }}>
@@ -184,7 +187,6 @@ export default function AdminPage() {
 
       {cramerPortfolio && (
         <>
-          {/* PORTFOLIO STATS */}
           <div className="stat-grid mb-24">
             <div className="stat-card">
               <div className="stat-label">Cramer Total Value</div>
@@ -202,7 +204,6 @@ export default function AdminPage() {
           </div>
 
           <div className="grid-2" style={{ alignItems: 'start' }}>
-            {/* ADD FORM */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">📺 Add / Update Cramer Holding</div>
@@ -219,7 +220,7 @@ export default function AdminPage() {
                     value={symbol}
                     onChange={e => { setSymbol(e.target.value.toUpperCase()); setSymbolInfo(null); setError('') }}
                     onBlur={handleSymbolBlur}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSymbolBlur(); }}}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSymbolBlur() } }}
                     placeholder="AAPL"
                     style={{ fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}
                   />
@@ -258,14 +259,18 @@ export default function AdminPage() {
               </form>
             </div>
 
-            {/* HOLDINGS TABLE */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Cramer's Holdings</div>
-                <span className="badge badge-gold">{cramerCalc.holdings.length} positions</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+                    Click headers to sort
+                  </span>
+                  <span className="badge badge-gold">{cramerCalc.holdings.length} positions</span>
+                </div>
               </div>
 
-              {cramerCalc.holdings.length === 0 ? (
+              {sortedCramerHoldings.length === 0 ? (
                 <div className="empty-state" style={{ padding: 40 }}>
                   <div className="empty-icon">📺</div>
                   <div className="empty-title">No Holdings Yet</div>
@@ -275,21 +280,23 @@ export default function AdminPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th onClick={() => handleAdminSort('symbol')} style={{ cursor: 'pointer' }}>
-                        Symbol {adminSortField === 'symbol' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
-                      </th>
-                      <th onClick={() => handleAdminSort('shares')} style={{ cursor: 'pointer' }}>
-                        Shares {adminSortField === 'shares' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
-                      </th>
-                      <th onClick={() => handleAdminSort('price')} style={{ cursor: 'pointer' }}>
-                        Price {adminSortField === 'price' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
-                      </th>
-                      <th onClick={() => handleAdminSort('value')} style={{ cursor: 'pointer' }}>
-                        Value {adminSortField === 'value' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
-                      </th>
-                      <th onClick={() => handleAdminSort('pct')} style={{ cursor: 'pointer' }}>
-                        % {adminSortField === 'pct' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
-                      </th>
+                      {[
+                        { field: 'symbol', label: 'Symbol' },
+                        { field: 'shares', label: 'Shares' },
+                        { field: 'price', label: 'Price' },
+                        { field: 'value', label: 'Value' },
+                        { field: 'pct', label: '%' }
+                      ].map(col => (
+                        <th
+                          key={col.field}
+                          onClick={() => handleAdminSort(col.field)}
+                          style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {col.label} <SortIcon field={col.field} />
+                          </span>
+                        </th>
+                      ))}
                       <th></th>
                     </tr>
                   </thead>
@@ -325,7 +332,6 @@ export default function AdminPage() {
         </>
       )}
 
-      {/* CASH MODAL */}
       {showCashModal && (
         <div className="modal-overlay" onClick={() => setShowCashModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
