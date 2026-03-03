@@ -13,15 +13,16 @@ const localCache = new Map()
 // YAHOO FINANCE (primary - no API key needed)
 // -------------------------------------------------------
 const fetchYahooPrice = async (symbol) => {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-
-  const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) })
+  const proxyUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d&corsDomain=finance.yahoo.com`
+  
+  const response = await fetch(
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(proxyUrl)}`,
+    { signal: AbortSignal.timeout(10000) }
+  )
+  
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-  const wrapper = await response.json()
-  const data = JSON.parse(wrapper.contents)
-
+  
+  const data = await response.json()
   const result = data?.chart?.result?.[0]
   if (!result) throw new Error('No data returned')
 
@@ -35,7 +36,7 @@ const fetchYahooPrice = async (symbol) => {
   return {
     symbol: symbol.toUpperCase(),
     price: parseFloat(price.toFixed(4)),
-    previous_close: parseFloat(previousClose?.toFixed(4) || 0),
+    previous_close: parseFloat((previousClose || 0).toFixed(4)),
     change_percent: parseFloat(changePercent.toFixed(4)),
     company_name: meta.longName || meta.shortName || symbol,
     fetched_at: new Date().toISOString()
