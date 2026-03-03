@@ -191,6 +191,7 @@ export default function AdminPage() {
                     value={symbol}
                     onChange={e => { setSymbol(e.target.value.toUpperCase()); setSymbolInfo(null); setError('') }}
                     onBlur={handleSymbolBlur}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSymbolBlur(); }}}
                     placeholder="AAPL"
                     style={{ fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}
                   />
