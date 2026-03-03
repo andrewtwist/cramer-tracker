@@ -43,12 +43,24 @@ export const getSession = async () => {
 // PROFILE HELPERS
 // -------------------------------------------------------
 export const getProfile = async (userId) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
-  return { data, error }
+  console.log('getProfile: starting query for', userId)
+  try {
+    const result = await Promise.race([
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile query timed out after 5s')), 5000)
+      )
+    ])
+    console.log('getProfile: result =', result)
+    return result
+  } catch (err) {
+    console.error('getProfile: error =', err.message)
+    return { data: null, error: err }
+  }
 }
 
 // -------------------------------------------------------
