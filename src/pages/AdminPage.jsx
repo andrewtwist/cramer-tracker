@@ -1,4 +1,32 @@
 import { useState, useEffect } from 'react'
+const [adminSortField, setAdminSortField] = useState('value')
+const [adminSortDir, setAdminSortDir] = useState('desc')
+
+const handleAdminSort = (field) => {
+  if (adminSortField === field) {
+    setAdminSortDir(d => d === 'asc' ? 'desc' : 'asc')
+  } else {
+    setAdminSortField(field)
+    setAdminSortDir('desc')
+  }
+}
+
+const sortedCramerHoldings = [...cramerCalc.holdings].sort((a, b) => {
+  let aVal, bVal
+  switch (adminSortField) {
+    case 'symbol':
+      return adminSortDir === 'asc'
+        ? a.symbol.localeCompare(b.symbol)
+        : b.symbol.localeCompare(a.symbol)
+    case 'shares': aVal = parseFloat(a.shares); bVal = parseFloat(b.shares); break
+    case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break
+    case 'value': aVal = a.value; bVal = b.value; break
+    case 'pct': aVal = a.pctOfPortfolio; bVal = b.pctOfPortfolio; break
+    default: aVal = a.value; bVal = b.value
+  }
+  return adminSortDir === 'asc' ? aVal - bVal : bVal - aVal
+})
+
 import { useAuth } from '../lib/auth'
 import { usePortfolio } from '../lib/usePortfolio'
 import { getCramerPortfolio, createPortfolio, updatePortfolioCash, upsertHolding, deleteHolding } from '../lib/supabase'
@@ -247,16 +275,26 @@ export default function AdminPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Symbol</th>
-                      <th>Shares</th>
-                      <th>Price</th>
-                      <th>Value</th>
-                      <th>%</th>
+                      <th onClick={() => handleAdminSort('symbol')} style={{ cursor: 'pointer' }}>
+                        Symbol {adminSortField === 'symbol' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
+                      </th>
+                      <th onClick={() => handleAdminSort('shares')} style={{ cursor: 'pointer' }}>
+                        Shares {adminSortField === 'shares' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
+                      </th>
+                      <th onClick={() => handleAdminSort('price')} style={{ cursor: 'pointer' }}>
+                        Price {adminSortField === 'price' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
+                      </th>
+                      <th onClick={() => handleAdminSort('value')} style={{ cursor: 'pointer' }}>
+                        Value {adminSortField === 'value' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
+                      </th>
+                      <th onClick={() => handleAdminSort('pct')} style={{ cursor: 'pointer' }}>
+                        % {adminSortField === 'pct' ? (adminSortDir === 'asc' ? '▲' : '▼') : '↕'}
+                      </th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cramerCalc.holdings.map(h => (
+                    {sortedCramerHoldings.map(h => (
                       <tr key={h.id}>
                         <td>
                           <div className="symbol" style={{ color: 'var(--gold)' }}>{h.symbol}</div>
