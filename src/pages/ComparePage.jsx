@@ -110,7 +110,7 @@ export default function ComparePage() {
       <div className="page-header flex-between">
         <div>
           <div className="page-title">VS CRAMER</div>
-          <div className="page-subtitle">Detailed comparison against Jim Cramer's Mad Money portfolio</div>
+          <div className="page-subtitle">Detailed comparison against Jim Cramer's</div>
         </div>
         <button className="btn btn-secondary" onClick={refreshPrices} disabled={loadingPrices}>
           <RefreshCw size={13} /> {loadingPrices ? 'Refreshing...' : 'Refresh'}
