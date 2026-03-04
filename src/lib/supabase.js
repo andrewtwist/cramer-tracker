@@ -145,3 +145,26 @@ export const upsertPriceCache = async (priceData) => {
     .select()
   return { data, error }
 }
+
+export const logCramerChange = async (symbol, action, oldShares, newShares, priceAtChange, companyName) => {
+  const { error } = await supabase
+    .from('cramer_changes')
+    .insert({
+      symbol: symbol.toUpperCase(),
+      company_name: companyName || null,
+      action,
+      old_shares: oldShares || null,
+      new_shares: newShares || null,
+      price_at_change: priceAtChange || null
+    })
+  return { error }
+}
+
+export const getCramerChanges = async (limit = 10) => {
+  const { data, error } = await supabase
+    .from('cramer_changes')
+    .select('*')
+    .order('changed_at', { ascending: false })
+    .limit(limit)
+  return { data, error }
+}
