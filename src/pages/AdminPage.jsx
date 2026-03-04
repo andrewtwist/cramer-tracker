@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { usePortfolio } from '../lib/usePortfolio'
-import { updatePortfolioCash, upsertHolding, deleteHolding } from '../lib/supabase'
+import { updatePortfolioCash, upsertHolding, deleteHolding, logCramerChange } from '../lib/supabase'
 import { validateSymbol } from '../lib/stocks'
 import { Plus, Trash2, RefreshCw, ShieldCheck, DollarSign, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
@@ -88,42 +88,60 @@ export default function AdminPage() {
     else setError(`Invalid symbol: ${symbol.toUpperCase()}`)
   }
 
-  const handleAddHolding = async (e) => {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
+const handleAddHolding = async (e) => {
+  e.preventDefault()
+  setError('')
+  setSuccess('')
 
-    const sharesNum = parseFloat(shares)
-    if (!symbol) { setError('Enter a symbol'); return }
-    if (isNaN(sharesNum) || sharesNum <= 0) { setError('Enter valid shares'); return }
-    if (!cramerPortfolio) { setError('Initialize Cramer portfolio first'); return }
+  const sharesNum = parseFloat(shares)
+  if (!symbol) { setError('Enter a symbol'); return }
+  if (isNaN(sharesNum) || sharesNum <= 0) { setError('Enter valid shares'); return }
+  if (!cramerPortfolio) { setError('Initialize Cramer portfolio first'); return }
 
-    setSubmitting(true)
-    try {
-      await upsertHolding(cramerPortfolio.id, symbol.toUpperCase(), sharesNum, symbolInfo?.company_name || null)
-      await loadPortfolios()
-      await refreshPrices()
-      setSuccess(`${symbol.toUpperCase()} updated in Cramer's portfolio!`)
-      setSymbol('')
-      setShares('')
-      setSymbolInfo(null)
-      setTimeout(() => setSuccess(''), 3000)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setSubmitting(false)
-    }
+  setSubmitting(true)
+  try {
+    const existing = cramerCalc.holdings.find(h => h.symbol === symbol.toUpperCase())
+    await upsertHolding(cramerPortfolio.id, symbol.toUpperCase(), sharesNum, symbolInfo?.company_name || null)
+    await logCramerChange(
+      symbol,
+      existing ? 'UPDATE' : 'ADD',
+      existing ? parseFloat(existing.shares) : null,
+      sharesNum,
+      symbolInfo?.price || null,
+      symbolInfo?.company_name || null
+    )
+    await loadPortfolios()
+    await refreshPrices()
+    setSuccess(`${symbol.toUpperCase()} updated in Cramer's portfolio!`)
+    setSymbol('')
+    setShares('')
+    setSymbolInfo(null)
+    setTimeout(() => setSuccess(''), 3000)
+  } catch (e) {
+    setError(e.message)
+  } finally {
+    setSubmitting(false)
   }
+}
 
   const handleRemove = async (holdingId, sym) => {
-    if (!confirm(`Remove ${sym} from Cramer's portfolio?`)) return
-    try {
-      await deleteHolding(holdingId)
-      await loadPortfolios()
-    } catch (e) {
-      setError(e.message)
-    }
+  if (!confirm(`Remove ${sym} from Cramer's portfolio?`)) return
+  try {
+    const existing = cramerCalc.holdings.find(h => h.symbol === sym)
+    await deleteHolding(holdingId)
+    await logCramerChange(
+      sym,
+      'REMOVE',
+      existing ? parseFloat(existing.shares) : null,
+      null,
+      existing?.currentPrice || null,
+      existing?.companyName || null
+    )
+    await loadPortfolios()
+  } catch (e) {
+    setError(e.message)
   }
+}
 
   const handleSaveCash = async () => {
     const amount = parseFloat(cashInput)
