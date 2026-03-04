@@ -61,9 +61,6 @@ export default function LoginPage() {
           <button className={`login-tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>
             Sign In
           </button>
-          <button className={`login-tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => { setTab('signup'); setError('') }}>
-            Create Account
-          </button>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -98,47 +95,7 @@ export default function LoginPage() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleSignUp}>
-            <div className="form-group">
-              <label className="form-label">Username</label>
-              <input
-                className="form-input"
-                type="text"
-                value={username}
-                onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                placeholder="trader_joe"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input
-                className="form-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min. 6 characters"
-                required
-              />
-            </div>
-            <button className="btn btn-primary w-full btn-lg" type="submit" disabled={loading}>
-              {loading ? 'Creating Account...' : 'Create Account →'}
-            </button>
-          </form>
-        )}
-
-        <div style={{ marginTop: 20, padding: '12px', background: 'var(--bg-input)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          
           💡 Admin accounts are promoted via Supabase SQL. See README for setup.
         </div>
       </div>
