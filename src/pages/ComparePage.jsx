@@ -4,6 +4,7 @@ import { RefreshCw, ChevronUp, ChevronDown, ChevronsUpDown, AlertCircle } from '
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
 const fmtPct = (n) => `${n >= 0 ? '+' : ''}${(n || 0).toFixed(2)}%`
+const fmtShares = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 2 })
 
 export default function ComparePage() {
   const { userCalc, cramerCalc, loadingPortfolio, loadingPrices, refreshPrices, prices } = usePortfolio()
@@ -66,10 +67,12 @@ export default function ComparePage() {
     const cramerValue = cramerShares * currentPrice
     const cramerAllocationPct = cramerTotal > 0 ? (cramerValue / cramerTotal) * 100 : 0
     const userAllocationPct = userTotal > 0 ? (userValue / userTotal) * 100 : 0
-    const targetValueForUser = (cramerAllocationPct / 100) * userTotal
-    const sharesNeededToMatch = currentPrice > 0 ? targetValueForUser / currentPrice : 0
-    const sharesShortfall = Math.max(0, sharesNeededToMatch - userShares)
-    const dollarShortfall = sharesShortfall * currentPrice
+
+    // Shares needed to match Cramer's allocation % in user's portfolio
+    const targetValue = (cramerAllocationPct / 100) * userTotal
+    const targetShares = currentPrice > 0 ? targetValue / currentPrice : 0
+    const sharesDiff = targetShares - userShares  // positive = need to buy, negative = need to sell
+    const dollarDiff = sharesDiff * currentPrice
     const allocDiff = userAllocationPct - cramerAllocationPct
 
     return {
@@ -78,7 +81,7 @@ export default function ComparePage() {
       currentPrice,
       userShares, cramerShares, userValue, cramerValue,
       cramerAllocationPct, userAllocationPct, allocDiff,
-      sharesNeededToMatch, sharesShortfall, dollarShortfall,
+      targetShares, sharesDiff, dollarDiff,
       changePercent: priceInfo?.change_percent || 0,
       onlyUser: !cramerHolding,
       onlyCramer: !userHolding
@@ -98,26 +101,16 @@ export default function ComparePage() {
       case 'cramerValue': aVal = a.cramerValue; bVal = b.cramerValue; break
       case 'cramerAlloc': aVal = a.cramerAllocationPct; bVal = b.cramerAllocationPct; break
       case 'allocDiff': aVal = a.allocDiff; bVal = b.allocDiff; break
+      case 'sharesDiff': aVal = Math.abs(a.sharesDiff); bVal = Math.abs(b.sharesDiff); break
+      case 'dollarDiff': aVal = Math.abs(a.dollarDiff); bVal = Math.abs(b.dollarDiff); break
       case 'change': aVal = a.changePercent; bVal = b.changePercent; break
-      case 'dollarShortfall': aVal = a.dollarShortfall; bVal = b.dollarShortfall; break
-      case 'sharesShortfall': aVal = a.sharesShortfall; bVal = b.sharesShortfall; break
-      case 'sharesNeeded': aVal = a.sharesNeededToMatch; bVal = b.sharesNeededToMatch; break
-      case 'cramerAllocNeeds': aVal = a.cramerAllocationPct; bVal = b.cramerAllocationPct; break
       default: aVal = a.cramerAllocationPct; bVal = b.cramerAllocationPct
     }
     return dir === 'asc' ? aVal - bVal : bVal - aVal
   })
 
   const sortedSymbolMap = sortRows(symbolMap, sortField, sortDir)
-  const needToBuy = symbolMap.filter(s => !s.onlyUser && s.sharesShortfall > 0.001)
-  const sortedNeedToBuy = sortRows(needToBuy, needsSortField, needsSortDir)
   const missingFromUser = symbolMap.filter(s => s.onlyCramer)
-
-  // Max allocation for visual scaling
-  const maxAlloc = Math.max(
-    ...symbolMap.map(s => Math.max(s.userAllocationPct, s.cramerAllocationPct)),
-    1
-  )
 
   return (
     <div>
@@ -163,18 +156,16 @@ export default function ComparePage() {
         </div>
       </div>
 
-      {/* ALLOCATION COMPARISON - THE MAIN VIEW */}
+      {/* MAIN ALLOCATION TABLE */}
       <div className="card mb-24">
         <div className="card-header">
           <div className="card-title">📊 Portfolio Allocation Comparison</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Click headers to sort</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--blue)', borderRadius: 2 }} /> You
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+              Click headers to sort
             </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--gold)', borderRadius: 2 }} /> Cramer
-            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)' }}>■ You</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gold)' }}>■ Cramer</span>
           </div>
         </div>
 
@@ -189,141 +180,123 @@ export default function ComparePage() {
               <tr>
                 <SortTh field="symbol" label="Symbol" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
                 <SortTh field="price" label="Price" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
-                <SortTh field="userAlloc" label="Your %" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--blue)' }} />
-                <th style={{ color: 'var(--blue)', minWidth: 120 }}>Your Allocation</th>
-                <SortTh field="cramerAlloc" label="Cramer %" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--gold)' }} />
-                <th style={{ color: 'var(--gold)', minWidth: 120 }}>Cramer Allocation</th>
-                <SortTh field="allocDiff" label="Difference" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
-                <SortTh field="userValue" label="Your Value" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
-                <SortTh field="cramerValue" label="Cramer Value" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="userShares" label="Your Shares" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="userAlloc" label="Your Allocation" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--blue)' }} />
+                <SortTh field="cramerShares" label="Cramer Shares" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="cramerAlloc" label="Cramer Allocation" onSort={handleSort} activeField={sortField} activeDir={sortDir} style={{ color: 'var(--gold)' }} />
+                <SortTh field="allocDiff" label="Alloc Diff" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="sharesDiff" label="Shares to Buy/Sell" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
+                <SortTh field="dollarDiff" label="$ to Buy/Sell" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
                 <SortTh field="change" label="Day Chg" onSort={handleSort} activeField={sortField} activeDir={sortDir} />
               </tr>
             </thead>
             <tbody>
-              {sortedSymbolMap.map(s => (
-                <tr key={s.symbol} style={{ opacity: s.currentPrice === 0 ? 0.5 : 1 }}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div className="symbol">{s.symbol}</div>
-                      {s.onlyCramer && <span className="badge badge-gold" style={{ fontSize: 8 }}>CRAMER</span>}
-                      {s.onlyUser && <span className="badge badge-blue" style={{ fontSize: 8 }}>YOURS</span>}
-                    </div>
-                    <div className="company-name">{s.companyName}</div>
-                  </td>
-                  <td className="price">{s.currentPrice > 0 ? fmt(s.currentPrice) : '—'}</td>
+              {sortedSymbolMap.map(s => {
+                const needsBuy = s.sharesDiff > 0.005
+                const needsSell = s.sharesDiff < -0.005
+                const isMatched = !needsBuy && !needsSell && !s.onlyCramer && !s.onlyUser
 
-                  {/* YOUR % */}
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: s.onlyCramer ? 'var(--text-muted)' : 'var(--blue)' }}>
-                    {s.userAllocationPct > 0 ? `${s.userAllocationPct.toFixed(2)}%` : '—'}
-                  </td>
-                  <td style={{ minWidth: 120 }}>
-                    <AllocBar pct={s.userAllocationPct} maxPct={maxAlloc} color="var(--blue)" />
-                  </td>
+                return (
+                  <tr key={s.symbol} style={{ opacity: s.currentPrice === 0 ? 0.5 : 1 }}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="symbol">{s.symbol}</div>
+                        {s.onlyCramer && <span className="badge badge-gold" style={{ fontSize: 8 }}>CRAMER</span>}
+                        {s.onlyUser && <span className="badge badge-blue" style={{ fontSize: 8 }}>YOURS</span>}
+                      </div>
+                      <div className="company-name">{s.companyName}</div>
+                    </td>
 
-                  {/* CRAMER % */}
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: s.onlyUser ? 'var(--text-muted)' : 'var(--gold)' }}>
-                    {s.cramerAllocationPct > 0 ? `${s.cramerAllocationPct.toFixed(2)}%` : '—'}
-                  </td>
-                  <td style={{ minWidth: 120 }}>
-                    <AllocBar pct={s.cramerAllocationPct} maxPct={maxAlloc} color="var(--gold)" />
-                  </td>
+                    <td className="price">{s.currentPrice > 0 ? fmt(s.currentPrice) : '—'}</td>
 
-                  {/* DIFFERENCE */}
-                  <td>
-                    {s.userAllocationPct > 0 && s.cramerAllocationPct > 0 ? (
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                        color: s.allocDiff >= 0 ? 'var(--green)' : 'var(--red)'
-                      }}>
-                        {s.allocDiff >= 0 ? '+' : ''}{s.allocDiff.toFixed(2)}%
+                    {/* YOUR SHARES + ALLOCATION */}
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {s.userShares > 0 ? fmtShares(s.userShares) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+                    <td>
+                      {s.userAllocationPct > 0 ? (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+                          color: 'var(--blue)'
+                        }}>
+                          {s.userAllocationPct.toFixed(2)}%
+                        </span>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+
+                    {/* CRAMER SHARES + ALLOCATION */}
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
+                      {s.cramerShares > 0 ? fmtShares(s.cramerShares) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+                    <td>
+                      {s.cramerAllocationPct > 0 ? (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+                          color: 'var(--gold)'
+                        }}>
+                          {s.cramerAllocationPct.toFixed(2)}%
+                        </span>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+
+                    {/* ALLOC DIFFERENCE */}
+                    <td>
+                      {s.userAllocationPct > 0 && s.cramerAllocationPct > 0 ? (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+                          color: s.allocDiff >= 0 ? 'var(--green)' : 'var(--red)'
+                        }}>
+                          {s.allocDiff >= 0 ? '+' : ''}{s.allocDiff.toFixed(2)}%
+                        </span>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+
+                    {/* SHARES TO BUY / SELL */}
+                    <td>
+                      {s.onlyUser || s.onlyCramer ? (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                      ) : isMatched ? (
+                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
+                      ) : (
+                        <div>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                            color: needsBuy ? 'var(--green)' : 'var(--red)'
+                          }}>
+                            {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
+                          </span>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                            {needsBuy ? 'BUY' : 'SELL'}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* DOLLAR AMOUNT TO BUY / SELL */}
+                    <td>
+                      {s.onlyUser || s.onlyCramer ? (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                      ) : isMatched ? (
+                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
+                      ) : (
+                        <span className={`badge ${needsBuy ? 'badge-green' : 'badge-red'}`}>
+                          {needsBuy ? '+' : '-'}{fmt(Math.abs(s.dollarDiff))}
+                        </span>
+                      )}
+                    </td>
+
+                    <td>
+                      <span className={`change-badge ${s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat'}`}>
+                        {s.changePercent >= 0 ? '▲' : '▼'}{Math.abs(s.changePercent).toFixed(2)}%
                       </span>
-                    ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
-                  </td>
-
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--blue)' }}>
-                    {s.userValue > 0 ? fmt(s.userValue) : '—'}
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
-                    {s.cramerValue > 0 ? fmt(s.cramerValue) : '—'}
-                  </td>
-                  <td>
-                    <span className={`change-badge ${s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat'}`}>
-                      {s.changePercent >= 0 ? '▲' : '▼'}{Math.abs(s.changePercent).toFixed(2)}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
       </div>
-
-      {/* SHARES NEEDED TABLE */}
-      {sortedNeedToBuy.length > 0 && (
-        <div className="card mb-24">
-          <div className="card-header">
-            <div className="card-title">🛒 Shares Needed to Match Cramer's Allocation</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Click headers to sort</span>
-              <span className="badge badge-gold">{sortedNeedToBuy.length} adjustments</span>
-            </div>
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Shares needed to match Cramer's percentage allocation, scaled to your portfolio size.
-          </p>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <SortTh field="symbol" label="Symbol" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
-                <SortTh field="userShares" label="Your Shares" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
-                <SortTh field="userAlloc" label="Your %" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} style={{ color: 'var(--blue)' }} />
-                <SortTh field="cramerAllocNeeds" label="Cramer %" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} style={{ color: 'var(--gold)' }} />
-                <SortTh field="sharesNeeded" label="Target Shares" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
-                <SortTh field="sharesShortfall" label="Need to Buy" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
-                <SortTh field="dollarShortfall" label="$ to Buy" onSort={handleNeedsSort} activeField={needsSortField} activeDir={needsSortDir} />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedNeedToBuy.map(s => (
-                <tr key={s.symbol}>
-                  <td>
-                    <div className="symbol">{s.symbol}</div>
-                    <div className="company-name">{s.companyName}</div>
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                    {s.userShares.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--blue)', width: 44 }}>
-                        {s.userAllocationPct.toFixed(2)}%
-                      </span>
-                      <AllocBar pct={s.userAllocationPct} maxPct={maxAlloc} color="var(--blue)" width={60} />
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--gold)', width: 44 }}>
-                        {s.cramerAllocationPct.toFixed(2)}%
-                      </span>
-                      <AllocBar pct={s.cramerAllocationPct} maxPct={maxAlloc} color="var(--gold)" width={60} />
-                    </div>
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--blue)' }}>
-                    {s.sharesNeededToMatch.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>
-                    +{s.sharesShortfall.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </td>
-                  <td>
-                    <span className="badge badge-red">{fmt(s.dollarShortfall)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
       {/* MISSING FROM USER */}
       {missingFromUser.length > 0 && (
@@ -345,28 +318,13 @@ export default function ComparePage() {
               }}>
                 <div style={{ color: 'var(--gold)', fontWeight: 700 }}>{s.symbol}</div>
                 <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-                  {fmt(s.cramerValue)} ({s.cramerAllocationPct.toFixed(2)}%)
+                  {fmt(s.cramerValue)} ({s.cramerAllocationPct.toFixed(2)}% of his portfolio)
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function AllocBar({ pct, maxPct, color, width = 80 }) {
-  const fillPct = maxPct > 0 ? (pct / maxPct) * 100 : 0
-  return (
-    <div style={{ width, height: 8, background: 'var(--bg-hover)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{
-        width: `${Math.min(fillPct, 100)}%`,
-        height: '100%',
-        background: color,
-        borderRadius: 4,
-        transition: 'width 0.4s ease'
-      }} />
     </div>
   )
 }
