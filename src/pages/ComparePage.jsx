@@ -293,19 +293,11 @@ export default function ComparePage() {
                       {s.onlyUser ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                       ) : isMatched ? (
-                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
+                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
                       ) : (
-                        <div>
-                          <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                            color: needsBuy ? 'var(--green)' : 'var(--red)'
-                          }}>
-                            {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
-                          </span>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
-                            {needsBuy ? 'BUY' : 'SELL'}
-                          </div>
-                        </div>
+                        <span className={`badge ${needsBuy ? 'badge-green' : 'badge-red'}`}>
+                          {needsBuy ? '+' : '-'}{fmt(Math.abs(s.dollarDiff))}
+                        </span>
                       )}
                         <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
                       ) : (
