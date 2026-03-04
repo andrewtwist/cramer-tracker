@@ -69,7 +69,9 @@ export default function ComparePage() {
     const userAllocationPct = userTotal > 0 ? (userValue / userTotal) * 100 : 0
 
     // Shares needed to match Cramer's allocation % in user's portfolio
-    const targetValue = (cramerAllocationPct / 100) * userTotal
+    // Uses userTotal + any missing stock value so even $0 holdings get a calculation
+    const effectiveUserTotal = userTotal > 0 ? userTotal : cramerTotal
+    const targetValue = (cramerAllocationPct / 100) * effectiveUserTotal
     const targetShares = currentPrice > 0 ? targetValue / currentPrice : 0
     const sharesDiff = targetShares - userShares  // positive = need to buy, negative = need to sell
     const dollarDiff = sharesDiff * currentPrice
@@ -253,9 +255,23 @@ export default function ComparePage() {
 
                     {/* SHARES TO BUY / SELL */}
                     <td>
-                      {s.onlyUser || s.onlyCramer ? (
+                     {s.onlyUser ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                       ) : isMatched ? (
+                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
+                      ) : (
+                        <div>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                            color: needsBuy ? 'var(--green)' : 'var(--red)'
+                          }}>
+                            {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
+                          </span>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                            {needsBuy ? 'BUY' : 'SELL'}
+                          </div>
+                        </div>
+                      )}
                         <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
                       ) : (
                         <div>
@@ -274,9 +290,23 @@ export default function ComparePage() {
 
                     {/* DOLLAR AMOUNT TO BUY / SELL */}
                     <td>
-                      {s.onlyUser || s.onlyCramer ? (
+                      {s.onlyUser ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                       ) : isMatched ? (
+                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
+                      ) : (
+                        <div>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                            color: needsBuy ? 'var(--green)' : 'var(--red)'
+                          }}>
+                            {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
+                          </span>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                            {needsBuy ? 'BUY' : 'SELL'}
+                          </div>
+                        </div>
+                      )}
                         <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
                       ) : (
                         <span className={`badge ${needsBuy ? 'badge-green' : 'badge-red'}`}>
