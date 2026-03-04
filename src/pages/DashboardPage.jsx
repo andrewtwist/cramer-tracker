@@ -59,7 +59,7 @@ export default function DashboardPage() {
       )}
 
       {/* TOP STATS */}
-      <div className="stat-grid">
+      <div className="stat-grid" style={{ marginBottom: 24 }}>
         <div className={`stat-card ${diffDollars >= 0 ? 'positive' : 'negative'}`}>
           <div className="stat-label">Your Portfolio Value</div>
           <div className="stat-value">{fmt(userTotal)}</div>
@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
       {/* PORTFOLIO SIZE COMPARISON */}
       {cramerTotal > 0 && (
-        <div className="card mb-24" style={{ marginTop: 24 }}>
+        <div className="card" style={{ marginBottom: 24 }}>
           <div className="card-header">
             <div className="card-title">Portfolio Size Comparison</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -100,87 +100,73 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* TOP HOLDINGS + RECENT CHANGES */}
-      <div className="grid-2" style={{ marginTop: cramerTotal > 0 ? 0 : 24 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* YOUR TOP HOLDINGS */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Your Top Holdings</div>
-              <span className="badge badge-blue">{userCalc.holdings.length} stocks</span>
-            </div>
-            {userCalc.holdings.length === 0 ? (
-              <div className="empty-state" style={{ padding: 30 }}>
-                <div className="empty-desc">Add holdings in My Portfolio →</div>
-              </div>
-            ) : (
-              userCalc.holdings.slice(0, 5).map(h => (
-                <HoldingRow key={h.id} holding={h} totalValue={userTotal} />
-              ))
-            )}
-          </div>
-
-          {/* CRAMER TOP HOLDINGS */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title"><span className="text-gold">★</span> Cramer's Top Holdings</div>
-              <span className="badge badge-gold">{cramerCalc.holdings.length} stocks</span>
-            </div>
-            {cramerCalc.holdings.length === 0 ? (
-              <div className="empty-state" style={{ padding: 30 }}>
-                <div className="empty-desc">Cramer portfolio not configured yet</div>
-              </div>
-            ) : (
-              cramerCalc.holdings.slice(0, 5).map(h => (
-                <HoldingRow key={h.id} holding={h} totalValue={cramerTotal} gold />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* RECENT CRAMER CHANGES */}
+      {/* TOP HOLDINGS SIDE BY SIDE */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-header">
-            <div className="card-title">📺 Recent Cramer Changes</div>
-            <span className="badge badge-gray">Last 10</span>
+            <div className="card-title">Your Top Holdings</div>
+            <span className="badge badge-blue">{userCalc.holdings.length} stocks</span>
           </div>
-
-          {loadingChanges ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-              <div className="spinner" />
-            </div>
-          ) : recentChanges.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-icon">📋</div>
-              <div className="empty-title">No Changes Yet</div>
-              <div className="empty-desc">Changes to Cramer's portfolio will appear here</div>
+          {userCalc.holdings.length === 0 ? (
+            <div className="empty-state" style={{ padding: 30 }}>
+              <div className="empty-desc">Add holdings in My Portfolio →</div>
             </div>
           ) : (
-            <div>
-              {recentChanges.map(change => (
-                <ChangeRow key={change.id} change={change} />
-              ))}
-            </div>
+            userCalc.holdings.slice(0, 5).map(h => (
+              <HoldingRow key={h.id} holding={h} totalValue={userTotal} />
+            ))
           )}
         </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title"><span className="text-gold">★</span> Cramer's Top Holdings</div>
+            <span className="badge badge-gold">{cramerCalc.holdings.length} stocks</span>
+          </div>
+          {cramerCalc.holdings.length === 0 ? (
+            <div className="empty-state" style={{ padding: 30 }}>
+              <div className="empty-desc">Cramer portfolio not configured yet</div>
+            </div>
+          ) : (
+            cramerCalc.holdings.slice(0, 5).map(h => (
+              <HoldingRow key={h.id} holding={h} totalValue={cramerTotal} gold />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* RECENT CRAMER CHANGES - FULL WIDTH */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">📺 Recent Cramer Changes</div>
+          <span className="badge badge-gray">Last 10</span>
+        </div>
+
+        {loadingChanges ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+            <div className="spinner" />
+          </div>
+        ) : recentChanges.length === 0 ? (
+          <div className="empty-state" style={{ padding: 40 }}>
+            <div className="empty-icon">📋</div>
+            <div className="empty-title">No Changes Yet</div>
+            <div className="empty-desc">Changes to Cramer's portfolio will appear here</div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 0 }}>
+            {recentChanges.map(change => (
+              <ChangeRow key={change.id} change={change} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 function ChangeRow({ change }) {
-  const actionColor = {
-    ADD: 'var(--green)',
-    UPDATE: 'var(--blue)',
-    REMOVE: 'var(--red)'
-  }[change.action] || 'var(--text-secondary)'
-
-  const actionBg = {
-    ADD: 'var(--green-bg)',
-    UPDATE: 'var(--blue-bg)',
-    REMOVE: 'var(--red-bg)'
-  }[change.action] || 'var(--bg-hover)'
-
+  const actionColor = { ADD: 'var(--green)', UPDATE: 'var(--blue)', REMOVE: 'var(--red)' }[change.action] || 'var(--text-secondary)'
+  const actionBg = { ADD: 'var(--green-bg)', UPDATE: 'var(--blue-bg)', REMOVE: 'var(--red-bg)' }[change.action] || 'var(--bg-hover)'
   const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
 
   const date = new Date(change.changed_at)
@@ -198,30 +184,15 @@ function ChangeRow({ change }) {
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '10px 0',
-      borderBottom: '1px solid var(--border-dim)'
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border-dim)' }}>
       <div style={{
-        width: 56,
-        textAlign: 'center',
-        padding: '3px 6px',
-        background: actionBg,
-        border: `1px solid ${actionColor}`,
-        borderRadius: 4,
-        fontFamily: 'var(--font-mono)',
-        fontSize: 9,
-        fontWeight: 700,
-        color: actionColor,
-        letterSpacing: 1,
-        flexShrink: 0
+        width: 56, textAlign: 'center', padding: '3px 6px',
+        background: actionBg, border: `1px solid ${actionColor}`,
+        borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 9,
+        fontWeight: 700, color: actionColor, letterSpacing: 1, flexShrink: 0
       }}>
         {change.action}
       </div>
-
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, color: 'var(--gold)' }}>
@@ -236,13 +207,10 @@ function ChangeRow({ change }) {
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
           {sharesChange()}
           {change.price_at_change && (
-            <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
-              @ {fmt(change.price_at_change)}
-            </span>
+            <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>@ {fmt(change.price_at_change)}</span>
           )}
         </div>
       </div>
-
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, textAlign: 'right' }}>
         {timeStr}
       </div>
@@ -261,15 +229,9 @@ function ComparisonBar({ label, value, maxValue, color }) {
       </div>
       <div style={{ flex: 1, height: 28, background: 'var(--bg-hover)', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{
-          width: `${pct}%`,
-          height: '100%',
-          background: color,
-          borderRadius: 3,
-          transition: 'width 0.5s ease',
-          display: 'flex',
-          alignItems: 'center',
-          paddingLeft: 8,
-          minWidth: 2
+          width: `${pct}%`, height: '100%', background: color, borderRadius: 3,
+          transition: 'width 0.5s ease', display: 'flex', alignItems: 'center',
+          paddingLeft: 8, minWidth: 2
         }}>
           {pct > 15 && (
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: '#000' }}>
