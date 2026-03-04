@@ -22,7 +22,7 @@ export default function Layout() {
           <TrendingUp size={20} color="var(--gold)" />
           <div>
             <div className="wordmark">CRAMER TRACKER</div>
-            <div className="tagline">vs Jim Cramer's Mad Money Portfolio</div>
+            <div className="tagline">vs Jim Cramer</div>
           </div>
         </div>
         <div className="topbar-right">
