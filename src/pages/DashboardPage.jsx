@@ -86,20 +86,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* PORTFOLIO SIZE COMPARISON */}
-      {cramerTotal > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">
-            <div className="card-title">Portfolio Size Comparison</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-              {userCalc.holdings.length} your holdings | {cramerCalc.holdings.length} Cramer holdings
-            </div>
-          </div>
-          <ComparisonBar label="You" value={userTotal} maxValue={Math.max(userTotal, cramerTotal) * 1.05} color="var(--blue)" />
-          <ComparisonBar label="Cramer" value={cramerTotal} maxValue={Math.max(userTotal, cramerTotal) * 1.05} color="var(--gold)" />
-        </div>
-      )}
-
       {/* TOP HOLDINGS SIDE BY SIDE */}
       <div className="grid-2" style={{ marginBottom: 24 }}>
         <div className="card">
@@ -112,7 +98,7 @@ export default function DashboardPage() {
               <div className="empty-desc">Add holdings in My Portfolio →</div>
             </div>
           ) : (
-            userCalc.holdings.slice(0, 5).map(h => (
+            userCalc.holdings.slice(0, 10).map(h => (
               <HoldingRow key={h.id} holding={h} totalValue={userTotal} />
             ))
           )}
@@ -128,14 +114,14 @@ export default function DashboardPage() {
               <div className="empty-desc">Cramer portfolio not configured yet</div>
             </div>
           ) : (
-            cramerCalc.holdings.slice(0, 5).map(h => (
+            cramerCalc.holdings.slice(0, 10).map(h => (
               <HoldingRow key={h.id} holding={h} totalValue={cramerTotal} gold />
             ))
           )}
         </div>
       </div>
 
-      {/* RECENT CRAMER CHANGES - FULL WIDTH */}
+      {/* RECENT CRAMER CHANGES - FULL WIDTH VERTICAL LIST */}
       <div className="card">
         <div className="card-header">
           <div className="card-title">📺 Recent Cramer Changes</div>
@@ -153,7 +139,7 @@ export default function DashboardPage() {
             <div className="empty-desc">Changes to Cramer's portfolio will appear here</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {recentChanges.map(change => (
               <ChangeRow key={change.id} change={change} />
             ))}
@@ -184,67 +170,66 @@ function ChangeRow({ change }) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border-dim)' }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      padding: '12px 4px',
+      borderBottom: '1px solid var(--border-dim)'
+    }}>
+      {/* ACTION BADGE */}
       <div style={{
-        width: 56, textAlign: 'center', padding: '3px 6px',
+        width: 60, textAlign: 'center', padding: '4px 6px',
         background: actionBg, border: `1px solid ${actionColor}`,
         borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 9,
         fontWeight: 700, color: actionColor, letterSpacing: 1, flexShrink: 0
       }}>
         {change.action}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, color: 'var(--gold)' }}>
-            {change.symbol}
-          </span>
-          {change.company_name && (
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {change.company_name}
-            </span>
-          )}
+
+      {/* SYMBOL + COMPANY */}
+      <div style={{ width: 80, flexShrink: 0 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14, color: 'var(--gold)' }}>
+          {change.symbol}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+        {change.company_name && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {change.company_name}
+          </div>
+        )}
+      </div>
+
+      {/* SHARES CHANGE */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
           {sharesChange()}
-          {change.price_at_change && (
-            <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>@ {fmt(change.price_at_change)}</span>
-          )}
         </div>
+        {change.price_at_change && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+            @ {fmt(change.price_at_change)} per share
+          </div>
+        )}
       </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, textAlign: 'right' }}>
-        {timeStr}
-      </div>
-    </div>
-  )
-}
 
-function ComparisonBar({ label, value, maxValue, color }) {
-  const pct = maxValue > 0 ? (value / maxValue) * 100 : 0
-  const fmtCompact = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(n)
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-      <div style={{ width: 60, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right' }}>
-        {label}
-      </div>
-      <div style={{ flex: 1, height: 28, background: 'var(--bg-hover)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{
-          width: `${pct}%`, height: '100%', background: color, borderRadius: 3,
-          transition: 'width 0.5s ease', display: 'flex', alignItems: 'center',
-          paddingLeft: 8, minWidth: 2
-        }}>
-          {pct > 15 && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: '#000' }}>
-              {fmtCompact(value)}
-            </span>
-          )}
-        </div>
-      </div>
-      {pct <= 15 && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', width: 60 }}>
-          {fmtCompact(value)}
+      {/* TOTAL VALUE OF CHANGE */}
+      {change.price_at_change && change.new_shares && change.action !== 'REMOVE' && (
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+            Position value
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
+            {fmt(parseFloat(change.new_shares) * parseFloat(change.price_at_change))}
+          </div>
         </div>
       )}
+
+      {/* TIMESTAMP */}
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
+        flexShrink: 0, textAlign: 'right', width: 90
+      }}>
+        {timeStr}
+      </div>
     </div>
   )
 }
@@ -254,20 +239,25 @@ function HoldingRow({ holding, totalValue, gold }) {
   const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-dim)' }}>
-      <div style={{ width: 44, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: gold ? 'var(--gold)' : 'var(--text-primary)' }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '9px 0', borderBottom: '1px solid var(--border-dim)'
+    }}>
+      <div style={{
+        width: 48, fontFamily: 'var(--font-mono)', fontSize: 12,
+        fontWeight: 700, color: gold ? 'var(--gold)' : 'var(--text-primary)',
+        flexShrink: 0
+      }}>
         {holding.symbol}
       </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ height: 4, background: 'var(--bg-hover)', borderRadius: 2 }}>
-          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: gold ? 'var(--gold)' : 'var(--blue)', borderRadius: 2 }} />
-        </div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {holding.companyName}
       </div>
-      <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+      <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0 }}>
         <div style={{ color: 'var(--text-primary)' }}>{fmt(holding.value)}</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{pct.toFixed(1)}%</div>
       </div>
-      <div style={{ width: 60, textAlign: 'right' }}>
+      <div style={{ width: 70, textAlign: 'right', flexShrink: 0 }}>
         <span className={`change-badge ${holding.changePercent > 0 ? 'up' : holding.changePercent < 0 ? 'down' : 'flat'}`}>
           {holding.changePercent >= 0 ? '▲' : '▼'}{Math.abs(holding.changePercent).toFixed(2)}%
         </span>
