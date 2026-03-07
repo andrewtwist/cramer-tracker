@@ -9,7 +9,6 @@ const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency:
 
 export default function AdminPage() {
   const { user } = useAuth()
-  const { supabase } = { supabase: null }
   const { cramerPortfolio, cramerCalc, loadingPortfolio, refreshPrices, loadPortfolios } = usePortfolio()
 
   const [symbol, setSymbol] = useState('')
@@ -88,60 +87,57 @@ export default function AdminPage() {
     else setError(`Invalid symbol: ${symbol.toUpperCase()}`)
   }
 
-const handleAddHolding = async (e) => {
-  e.preventDefault()
-  setError('')
-  setSuccess('')
-
-  const sharesNum = parseFloat(shares)
-  if (!symbol) { setError('Enter a symbol'); return }
-  if (isNaN(sharesNum) || sharesNum <= 0) { setError('Enter valid shares'); return }
-  if (!cramerPortfolio) { setError('Initialize Cramer portfolio first'); return }
-
-  setSubmitting(true)
-  try {
-    const existing = cramerCalc.holdings.find(h => h.symbol === symbol.toUpperCase())
-    await upsertHolding(cramerPortfolio.id, symbol.toUpperCase(), sharesNum, symbolInfo?.company_name || null)
-    await logCramerChange(
-      symbol,
-      existing ? 'UPDATE' : 'ADD',
-      existing ? parseFloat(existing.shares) : null,
-      sharesNum,
-      symbolInfo?.price || null,
-      symbolInfo?.company_name || null
-    )
-    await loadPortfolios()
-    await refreshPrices()
-    setSuccess(`${symbol.toUpperCase()} updated in Cramer's portfolio!`)
-    setSymbol('')
-    setShares('')
-    setSymbolInfo(null)
-    setTimeout(() => setSuccess(''), 3000)
-  } catch (e) {
-    setError(e.message)
-  } finally {
-    setSubmitting(false)
+  const handleAddHolding = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    const sharesNum = parseFloat(shares)
+    if (!symbol) { setError('Enter a symbol'); return }
+    if (isNaN(sharesNum) || sharesNum <= 0) { setError('Enter valid shares'); return }
+    if (!cramerPortfolio) { setError('Initialize Cramer portfolio first'); return }
+    setSubmitting(true)
+    try {
+      const existing = cramerCalc.holdings.find(h => h.symbol === symbol.toUpperCase())
+      await upsertHolding(cramerPortfolio.id, symbol.toUpperCase(), sharesNum, symbolInfo?.company_name || null)
+      await logCramerChange(
+        symbol,
+        existing ? 'UPDATE' : 'ADD',
+        existing ? parseFloat(existing.shares) : null,
+        sharesNum,
+        symbolInfo?.price || null,
+        symbolInfo?.company_name || null
+      )
+      await loadPortfolios()
+      await refreshPrices()
+      setSuccess(`${symbol.toUpperCase()} updated in Cramer's portfolio!`)
+      setSymbol('')
+      setShares('')
+      setSymbolInfo(null)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
-}
 
   const handleRemove = async (holdingId, sym) => {
-  if (!confirm(`Remove ${sym} from Cramer's portfolio?`)) return
-  try {
-    const existing = cramerCalc.holdings.find(h => h.symbol === sym)
-    await deleteHolding(holdingId)
-    await logCramerChange(
-      sym,
-      'REMOVE',
-      existing ? parseFloat(existing.shares) : null,
-      null,
-      existing?.currentPrice || null,
-      existing?.companyName || null
-    )
-    await loadPortfolios()
-  } catch (e) {
-    setError(e.message)
+    if (!confirm(`Remove ${sym} from Cramer's portfolio?`)) return
+    try {
+      const existing = cramerCalc.holdings.find(h => h.symbol === sym)
+      await deleteHolding(holdingId)
+      await logCramerChange(
+        sym, 'REMOVE',
+        existing ? parseFloat(existing.shares) : null,
+        null,
+        existing?.currentPrice || null,
+        existing?.companyName || null
+      )
+      await loadPortfolios()
+    } catch (e) {
+      setError(e.message)
+    }
   }
-}
 
   const handleSaveCash = async () => {
     const amount = parseFloat(cashInput)
@@ -167,10 +163,10 @@ const handleAddHolding = async (e) => {
       <div className="page-header flex-between">
         <div>
           <div className="page-title">
-            <ShieldCheck size={24} style={{ display: 'inline', marginRight: 10, color: 'var(--gold)' }} />
+            <ShieldCheck size={22} style={{ display: 'inline', marginRight: 8, color: 'var(--gold)' }} />
             ADMIN PANEL
           </div>
-          <div className="page-subtitle">Manage Jim Cramer's Mad Money portfolio</div>
+          <div className="page-subtitle">Manage Jim Cramer's portfolio</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {cramerPortfolio && (
@@ -179,22 +175,22 @@ const handleAddHolding = async (e) => {
             </button>
           )}
           <button className="btn btn-secondary" onClick={refreshPrices}>
-            <RefreshCw size={13} /> Refresh Prices
+            <RefreshCw size={13} /> Refresh
           </button>
         </div>
       </div>
 
       {!cramerPortfolio && (
-        <div className="card mb-24" style={{ borderColor: 'var(--gold-dim)', background: 'rgba(240,192,64,0.03)' }}>
+        <div className="card" style={{ marginBottom: 24, borderColor: 'var(--gold-dim)', background: 'rgba(240,192,64,0.03)' }}>
           <div className="cramer-avatar" style={{ marginBottom: 16 }}>
             <div className="cramer-icon">📺</div>
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>Jim Cramer</div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Mad Money Host & Portfolio Manager</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Mad Money Host</div>
             </div>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Cramer's portfolio hasn't been set up yet. Initialize it to start tracking his holdings.
+            Cramer's portfolio hasn't been set up yet.
           </p>
           {error && <div className="alert alert-error">{error}</div>}
           <button className="btn btn-primary" onClick={handleInitCramerPortfolio} disabled={initializingPortfolio}>
@@ -205,9 +201,9 @@ const handleAddHolding = async (e) => {
 
       {cramerPortfolio && (
         <>
-          <div className="stat-grid mb-24">
+          <div className="stat-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card">
-              <div className="stat-label">Cramer Total Value</div>
+              <div className="stat-label">Total Value</div>
               <div className="stat-value gold">{fmt(cramerCalc.totalValue)}</div>
               <div className="stat-sub">{cramerCalc.holdings.length} holdings</div>
             </div>
@@ -222,9 +218,10 @@ const handleAddHolding = async (e) => {
           </div>
 
           <div className="grid-2" style={{ alignItems: 'start' }}>
+            {/* ADD FORM */}
             <div className="card">
               <div className="card-header">
-                <div className="card-title">📺 Add / Update Cramer Holding</div>
+                <div className="card-title">📺 Add / Update Holding</div>
               </div>
 
               {error && <div className="alert alert-error">{error}</div>}
@@ -277,6 +274,7 @@ const handleAddHolding = async (e) => {
               </form>
             </div>
 
+            {/* HOLDINGS TABLE */}
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Cramer's Holdings</div>
@@ -295,61 +293,64 @@ const handleAddHolding = async (e) => {
                   <div className="empty-desc">Add Cramer's stocks using the form</div>
                 </div>
               ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      {[
-                        { field: 'symbol', label: 'Symbol' },
-                        { field: 'shares', label: 'Shares' },
-                        { field: 'price', label: 'Price' },
-                        { field: 'value', label: 'Value' },
-                        { field: 'pct', label: '%' }
-                      ].map(col => (
-                        <th
-                          key={col.field}
-                          onClick={() => handleAdminSort(col.field)}
-                          style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
-                        >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            {col.label} <SortIcon field={col.field} />
-                          </span>
-                        </th>
-                      ))}
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedCramerHoldings.map(h => (
-                      <tr key={h.id}>
-                        <td>
-                          <div className="symbol" style={{ color: 'var(--gold)' }}>{h.symbol}</div>
-                          <div className="company-name">{h.companyName}</div>
-                        </td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                          {parseFloat(h.shares).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="price">{h.currentPrice > 0 ? fmt(h.currentPrice) : '—'}</td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
-                          {h.value > 0 ? fmt(h.value) : '—'}
-                        </td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
-                          {h.pctOfPortfolio.toFixed(1)}%
-                        </td>
-                        <td>
-                          <button className="btn btn-ghost btn-sm" onClick={() => handleRemove(h.id, h.symbol)}>
-                            <Trash2 size={12} color="var(--red)" />
-                          </button>
-                        </td>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        {[
+                          { field: 'symbol', label: 'Symbol' },
+                          { field: 'shares', label: 'Shares' },
+                          { field: 'price', label: 'Price' },
+                          { field: 'value', label: 'Value' },
+                          { field: 'pct', label: '%' }
+                        ].map(col => (
+                          <th
+                            key={col.field}
+                            onClick={() => handleAdminSort(col.field)}
+                            style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                          >
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              {col.label} <SortIcon field={col.field} />
+                            </span>
+                          </th>
+                        ))}
+                        <th></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {sortedCramerHoldings.map(h => (
+                        <tr key={h.id}>
+                          <td>
+                            <div className="symbol" style={{ color: 'var(--gold)' }}>{h.symbol}</div>
+                            <div className="company-name">{h.companyName}</div>
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                            {parseFloat(h.shares).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="price">{h.currentPrice > 0 ? fmt(h.currentPrice) : '—'}</td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
+                            {h.value > 0 ? fmt(h.value) : '—'}
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+                            {h.pctOfPortfolio.toFixed(1)}%
+                          </td>
+                          <td>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleRemove(h.id, h.symbol)}>
+                              <Trash2 size={12} color="var(--red)" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
         </>
       )}
 
+      {/* CASH MODAL */}
       {showCashModal && (
         <div className="modal-overlay" onClick={() => setShowCashModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
