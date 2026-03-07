@@ -39,59 +39,72 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* SIDEBAR */}
+      {/* DESKTOP SIDEBAR */}
       <nav className="sidebar">
         <div className="sidebar-section-label">Navigation</div>
 
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <LayoutDashboard size={15} />
-          Dashboard
+        <NavLink to="/dashboard" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <LayoutDashboard size={15} /> Dashboard
         </NavLink>
 
-        <NavLink
-          to="/portfolio"
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <Briefcase size={15} />
-          My Portfolio
+        <NavLink to="/portfolio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Briefcase size={15} /> My Portfolio
         </NavLink>
 
-        <NavLink
-          to="/compare"
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <BarChart3 size={15} />
-          vs Cramer
+        <NavLink to="/compare" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <BarChart3 size={15} /> vs Cramer
         </NavLink>
 
         {isAdmin && (
           <>
             <div className="sidebar-section-label">Admin</div>
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-            >
-              <ShieldCheck size={15} />
-              Cramer Portfolio
+            <NavLink to="/admin" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <ShieldCheck size={15} /> Cramer Portfolio
             </NavLink>
           </>
         )}
 
         <div className="sidebar-bottom">
           <button className="sidebar-link" onClick={handleSignOut}>
-            <LogOut size={15} />
-            Sign Out
+            <LogOut size={15} /> Sign Out
           </button>
         </div>
       </nav>
 
-      {/* MAIN */}
+      {/* MAIN CONTENT */}
       <main className="main-content">
         <Outlet />
       </main>
+
+      {/* MOBILE BOTTOM NAV */}
+      <nav className="bottom-nav">
+        <NavLink to="/dashboard" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <LayoutDashboard size={20} />
+          Dashboard
+        </NavLink>
+
+        <NavLink to="/portfolio" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <Briefcase size={20} />
+          Portfolio
+        </NavLink>
+
+        <NavLink to="/compare" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <BarChart3 size={20} />
+          vs Cramer
+        </NavLink>
+
+        {isAdmin && (
+          <NavLink to="/admin" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+            <ShieldCheck size={20} />
+            Admin
+          </NavLink>
+        )}
+
+        <button className="bottom-nav-item" onClick={handleSignOut}>
+          <LogOut size={20} />
+          Sign Out
+        </button>
+      </nav>
     </div>
   )
 }
