@@ -33,34 +33,15 @@ export default function PortfolioPage() {
     let aVal, bVal
     switch (sortField) {
       case 'symbol':
-        aVal = a.symbol
-        bVal = b.symbol
         return sortDir === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal)
-      case 'shares':
-        aVal = parseFloat(a.shares)
-        bVal = parseFloat(b.shares)
-        break
-      case 'price':
-        aVal = a.currentPrice
-        bVal = b.currentPrice
-        break
-      case 'value':
-        aVal = a.value
-        bVal = b.value
-        break
-      case 'pct':
-        aVal = a.pctOfPortfolio
-        bVal = b.pctOfPortfolio
-        break
-      case 'change':
-        aVal = a.changePercent
-        bVal = b.changePercent
-        break
-      default:
-        aVal = a.value
-        bVal = b.value
+          ? a.symbol.localeCompare(b.symbol)
+          : b.symbol.localeCompare(a.symbol)
+      case 'shares': aVal = parseFloat(a.shares); bVal = parseFloat(b.shares); break
+      case 'price': aVal = a.currentPrice; bVal = b.currentPrice; break
+      case 'value': aVal = a.value; bVal = b.value; break
+      case 'pct': aVal = a.pctOfPortfolio; bVal = b.pctOfPortfolio; break
+      case 'change': aVal = a.changePercent; bVal = b.changePercent; break
+      default: aVal = a.value; bVal = b.value
     }
     return sortDir === 'asc' ? aVal - bVal : bVal - aVal
   })
@@ -72,15 +53,10 @@ export default function PortfolioPage() {
       : <ChevronDown size={12} style={{ color: 'var(--gold)' }} />
   }
 
-  const SortHeader = ({ field, label, align }) => (
+  const SortHeader = ({ field, label }) => (
     <th
       onClick={() => handleSort(field)}
-      style={{
-        cursor: 'pointer',
-        userSelect: 'none',
-        textAlign: align || 'left',
-        whiteSpace: 'nowrap'
-      }}
+      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         {label} <SortIcon field={field} />
@@ -106,11 +82,9 @@ export default function PortfolioPage() {
     e.preventDefault()
     setError('')
     setSuccess('')
-
     const sharesNum = parseFloat(shares)
     if (!symbol) { setError('Enter a stock symbol'); return }
     if (isNaN(sharesNum) || sharesNum <= 0) { setError('Enter a valid number of shares'); return }
-
     setSubmitting(true)
     try {
       await addOrUpdateHolding(symbol.toUpperCase(), sharesNum)
@@ -165,13 +139,13 @@ export default function PortfolioPage() {
             <DollarSign size={13} /> Set Cash
           </button>
           <button className="btn btn-secondary" onClick={refreshPrices} disabled={loadingPrices}>
-            <RefreshCw size={13} /> {loadingPrices ? 'Refreshing...' : 'Refresh Prices'}
+            <RefreshCw size={13} /> {loadingPrices ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
       </div>
 
       {/* SUMMARY */}
-      <div className="stat-grid mb-24">
+      <div className="stat-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card">
           <div className="stat-label">Total Value</div>
           <div className="stat-value">{fmt(userCalc.totalValue)}</div>
@@ -264,7 +238,7 @@ export default function PortfolioPage() {
             <div className="card-title">Holdings</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
-                Click column headers to sort
+                Click columns to sort
               </span>
               <span className="badge badge-blue">{userCalc.holdings.length} positions</span>
             </div>
@@ -274,60 +248,62 @@ export default function PortfolioPage() {
             <div className="empty-state" style={{ padding: 40 }}>
               <div className="empty-icon">📈</div>
               <div className="empty-title">No Holdings Yet</div>
-              <div className="empty-desc">Add your first stock using the form on the left</div>
+              <div className="empty-desc">Add your first stock using the form</div>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <SortHeader field="symbol" label="Symbol" />
-                  <SortHeader field="shares" label="Shares" />
-                  <SortHeader field="price" label="Price" />
-                  <SortHeader field="value" label="Value" />
-                  <SortHeader field="pct" label="% Port" />
-                  <SortHeader field="change" label="Change" />
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedHoldings.map(h => (
-                  <tr key={h.id}>
-                    <td>
-                      <div className="symbol">{h.symbol}</div>
-                      <div className="company-name">{h.companyName}</div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <SortHeader field="symbol" label="Symbol" />
+                    <SortHeader field="shares" label="Shares" />
+                    <SortHeader field="price" label="Price" />
+                    <SortHeader field="value" label="Value" />
+                    <SortHeader field="pct" label="% Port" />
+                    <SortHeader field="change" label="Change" />
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedHoldings.map(h => (
+                    <tr key={h.id}>
+                      <td>
+                        <div className="symbol">{h.symbol}</div>
+                        <div className="company-name">{h.companyName}</div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {parseFloat(h.shares).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                      </td>
+                      <td className="price">{h.currentPrice > 0 ? fmt(h.currentPrice) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{h.value > 0 ? fmt(h.value) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {h.pctOfPortfolio.toFixed(1)}%
+                      </td>
+                      <td>
+                        <span className={`change-badge ${h.changePercent > 0 ? 'up' : h.changePercent < 0 ? 'down' : 'flat'}`}>
+                          {h.changePercent >= 0 ? '▲' : '▼'}{Math.abs(h.changePercent).toFixed(2)}%
+                        </span>
+                      </td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleRemove(h.id, h.symbol)}>
+                          <Trash2 size={12} color="var(--red)" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', paddingTop: 12 }}>
+                      Cash: {fmt(userCalc.cashValue)}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                      {parseFloat(h.shares).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                    </td>
-                    <td className="price">{h.currentPrice > 0 ? fmt(h.currentPrice) : '—'}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{h.value > 0 ? fmt(h.value) : '—'}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-                      {h.pctOfPortfolio.toFixed(1)}%
-                    </td>
-                    <td>
-                      <span className={`change-badge ${h.changePercent > 0 ? 'up' : h.changePercent < 0 ? 'down' : 'flat'}`}>
-                        {h.changePercent >= 0 ? '▲' : '▼'}{Math.abs(h.changePercent).toFixed(2)}%
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleRemove(h.id, h.symbol)}>
-                        <Trash2 size={12} color="var(--red)" />
-                      </button>
+                    <td colSpan={4} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, paddingTop: 12 }}>
+                      {fmt(userCalc.totalValue)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', paddingTop: 12 }}>
-                    Cash: {fmt(userCalc.cashValue)}
-                  </td>
-                  <td colSpan={4} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, paddingTop: 12 }}>
-                    {fmt(userCalc.totalValue)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           )}
         </div>
       </div>
