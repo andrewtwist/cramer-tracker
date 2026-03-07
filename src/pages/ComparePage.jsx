@@ -60,8 +60,6 @@ export default function ComparePage() {
     const cramerValue = cramerShares * currentPrice
     const cramerAllocationPct = cramerTotal > 0 ? (cramerValue / cramerTotal) * 100 : 0
     const userAllocationPct = userTotal > 0 ? (userValue / userTotal) * 100 : 0
-
-    // Use user's total if they have a portfolio, otherwise fall back to Cramer's for scaling
     const effectiveUserTotal = userTotal > 0 ? userTotal : cramerTotal
     const targetValue = (cramerAllocationPct / 100) * effectiveUserTotal
     const targetShares = currentPrice > 0 ? targetValue / currentPrice : 0
@@ -72,8 +70,7 @@ export default function ComparePage() {
     return {
       symbol: sym,
       companyName: priceInfo?.company_name || userHolding?.companyName || cramerHolding?.companyName || sym,
-      currentPrice,
-      userShares, cramerShares, userValue, cramerValue,
+      currentPrice, userShares, cramerShares, userValue, cramerValue,
       cramerAllocationPct, userAllocationPct, allocDiff,
       targetShares, sharesDiff, dollarDiff,
       changePercent: priceInfo?.change_percent || 0,
@@ -110,7 +107,7 @@ export default function ComparePage() {
       <div className="page-header flex-between">
         <div>
           <div className="page-title">VS CRAMER</div>
-          <div className="page-subtitle">Detailed comparison against Jim Cramer's</div>
+          <div className="page-subtitle">Detailed comparison against Jim Cramer</div>
         </div>
         <button className="btn btn-secondary" onClick={refreshPrices} disabled={loadingPrices}>
           <RefreshCw size={13} /> {loadingPrices ? 'Refreshing...' : 'Refresh'}
@@ -124,7 +121,7 @@ export default function ComparePage() {
       )}
 
       {/* HEADLINE STATS */}
-      <div className="stat-grid mb-24">
+      <div className="stat-grid" style={{ marginBottom: 24 }}>
         <div className={`stat-card ${diffDollars >= 0 ? 'positive' : 'negative'}`}>
           <div className="stat-label">Performance vs Cramer</div>
           <div className={`stat-value ${diffDollars >= 0 ? 'positive' : 'negative'}`}>{fmtPct(diffPercent)}</div>
@@ -150,13 +147,11 @@ export default function ComparePage() {
       </div>
 
       {/* MAIN ALLOCATION TABLE */}
-      <div className="card mb-24">
+      <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div className="card-title">📊 Portfolio Allocation Comparison</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
-              Click headers to sort
-            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Click headers to sort</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)' }}>■ You</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--gold)' }}>■ Cramer</span>
           </div>
@@ -169,131 +164,100 @@ export default function ComparePage() {
             <div className="empty-desc">Add holdings to your portfolio and ensure Cramer's is configured</div>
           </div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <SortTh field="symbol" label="Symbol" />
-                <SortTh field="price" label="Price" />
-                <SortTh field="userShares" label="Your Shares" />
-                <SortTh field="userAlloc" label="Your Allocation" style={{ color: 'var(--blue)' }} />
-                <SortTh field="cramerShares" label="Cramer Shares" />
-                <SortTh field="cramerAlloc" label="Cramer Allocation" style={{ color: 'var(--gold)' }} />
-                <SortTh field="allocDiff" label="Alloc Diff" />
-                <SortTh field="sharesDiff" label="Shares to Buy/Sell" />
-                <SortTh field="dollarDiff" label="$ to Buy/Sell" />
-                <SortTh field="change" label="Day Chg" />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedSymbolMap.map(s => {
-                const needsBuy = s.sharesDiff > 0.005
-                const needsSell = s.sharesDiff < -0.005
-                const isMatched = !needsBuy && !needsSell && !s.onlyCramer && !s.onlyUser
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <SortTh field="symbol" label="Symbol" />
+                  <SortTh field="price" label="Price" />
+                  <SortTh field="userShares" label="Your Shares" />
+                  <SortTh field="userAlloc" label="Your Allocation" style={{ color: 'var(--blue)' }} />
+                  <SortTh field="cramerShares" label="Cramer Shares" />
+                  <SortTh field="cramerAlloc" label="Cramer Allocation" style={{ color: 'var(--gold)' }} />
+                  <SortTh field="allocDiff" label="Alloc Diff" />
+                  <SortTh field="sharesDiff" label="Shares to Buy/Sell" />
+                  <SortTh field="dollarDiff" label="$ to Buy/Sell" />
+                  <SortTh field="change" label="Day Chg" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSymbolMap.map(s => {
+                  const needsBuy = s.sharesDiff > 0.005
+                  const needsSell = s.sharesDiff < -0.005
+                  const isMatched = !needsBuy && !needsSell && !s.onlyCramer && !s.onlyUser
 
-                return (
-                  <tr key={s.symbol} style={{ opacity: s.currentPrice === 0 ? 0.5 : 1 }}>
-                    {/* SYMBOL */}
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div className="symbol">{s.symbol}</div>
-                        {s.onlyCramer && <span className="badge badge-gold" style={{ fontSize: 8 }}>CRAMER</span>}
-                        {s.onlyUser && <span className="badge badge-blue" style={{ fontSize: 8 }}>YOURS</span>}
-                      </div>
-                      <div className="company-name">{s.companyName}</div>
-                    </td>
-
-                    {/* PRICE */}
-                    <td className="price">{s.currentPrice > 0 ? fmt(s.currentPrice) : '—'}</td>
-
-                    {/* YOUR SHARES */}
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                      {s.userShares > 0
-                        ? fmtShares(s.userShares)
-                        : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-
-                    {/* YOUR ALLOCATION % */}
-                    <td>
-                      {s.userAllocationPct > 0 ? (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--blue)' }}>
-                          {s.userAllocationPct.toFixed(2)}%
-                        </span>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-
-                    {/* CRAMER SHARES */}
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
-                      {s.cramerShares > 0
-                        ? fmtShares(s.cramerShares)
-                        : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-
-                    {/* CRAMER ALLOCATION % */}
-                    <td>
-                      {s.cramerAllocationPct > 0 ? (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>
-                          {s.cramerAllocationPct.toFixed(2)}%
-                        </span>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-
-                    {/* ALLOCATION DIFFERENCE */}
-                    <td>
-                      {s.userAllocationPct > 0 && s.cramerAllocationPct > 0 ? (
-                        <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                          color: s.allocDiff >= 0 ? 'var(--green)' : 'var(--red)'
-                        }}>
-                          {s.allocDiff >= 0 ? '+' : ''}{s.allocDiff.toFixed(2)}%
-                        </span>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-
-                    {/* SHARES TO BUY / SELL */}
-                    <td>
-                      {s.onlyUser ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
-                      ) : isMatched ? (
-                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
-                      ) : (
-                        <div>
-                          <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                            color: needsBuy ? 'var(--green)' : 'var(--red)'
-                          }}>
-                            {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
-                          </span>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
-                            {needsBuy ? 'BUY' : 'SELL'}
-                          </div>
+                  return (
+                    <tr key={s.symbol} style={{ opacity: s.currentPrice === 0 ? 0.5 : 1 }}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className="symbol">{s.symbol}</div>
+                          {s.onlyCramer && <span className="badge badge-gold" style={{ fontSize: 8 }}>CRAMER</span>}
+                          {s.onlyUser && <span className="badge badge-blue" style={{ fontSize: 8 }}>YOURS</span>}
                         </div>
-                      )}
-                    </td>
-
-                    {/* DOLLAR AMOUNT TO BUY / SELL */}
-                    <td>
-                      {s.onlyUser ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
-                      ) : isMatched ? (
-                        <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
-                      ) : (
-                        <span className={`badge ${needsBuy ? 'badge-green' : 'badge-red'}`}>
-                          {needsBuy ? '+' : '-'}{fmt(Math.abs(s.dollarDiff))}
+                        <div className="company-name">{s.companyName}</div>
+                      </td>
+                      <td className="price">{s.currentPrice > 0 ? fmt(s.currentPrice) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {s.userShares > 0 ? fmtShares(s.userShares) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        {s.userAllocationPct > 0
+                          ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--blue)' }}>{s.userAllocationPct.toFixed(2)}%</span>
+                          : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)' }}>
+                        {s.cramerShares > 0 ? fmtShares(s.cramerShares) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        {s.cramerAllocationPct > 0
+                          ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>{s.cramerAllocationPct.toFixed(2)}%</span>
+                          : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        {s.userAllocationPct > 0 && s.cramerAllocationPct > 0
+                          ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: s.allocDiff >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                              {s.allocDiff >= 0 ? '+' : ''}{s.allocDiff.toFixed(2)}%
+                            </span>
+                          : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        {s.onlyUser ? (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                        ) : isMatched ? (
+                          <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓ Matched</span>
+                        ) : (
+                          <div>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: needsBuy ? 'var(--green)' : 'var(--red)' }}>
+                              {needsBuy ? '+' : ''}{fmtShares(s.sharesDiff)} shares
+                            </span>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                              {needsBuy ? 'BUY' : 'SELL'}
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {s.onlyUser ? (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                        ) : isMatched ? (
+                          <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>✓</span>
+                        ) : (
+                          <span className={`badge ${needsBuy ? 'badge-green' : 'badge-red'}`}>
+                            {needsBuy ? '+' : '-'}{fmt(Math.abs(s.dollarDiff))}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`change-badge ${s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat'}`}>
+                          {s.changePercent >= 0 ? '▲' : '▼'}{Math.abs(s.changePercent).toFixed(2)}%
                         </span>
-                      )}
-                    </td>
-
-                    {/* DAY CHANGE */}
-                    <td>
-                      <span className={`change-badge ${s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat'}`}>
-                        {s.changePercent >= 0 ? '▲' : '▼'}{Math.abs(s.changePercent).toFixed(2)}%
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
